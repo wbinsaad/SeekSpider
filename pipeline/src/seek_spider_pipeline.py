@@ -331,6 +331,78 @@ register_pipeline(
             ),
             schedule=CronTrigger(hour=19, minute=15, timezone=PERTH_TZ),
         ),
+
+        # Gold Coast - Daily 7:30 AM & 7:30 PM
+        Trigger(
+            id="goldcoast_daily_7_30am",
+            name="Gold Coast Daily 7:30 AM",
+            description="Scrape Gold Coast IT jobs at 7:30 AM",
+            params=SeekSpiderParams(
+                region="Gold Coast",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=7, minute=30, timezone=PERTH_TZ),
+        ),
+        Trigger(
+            id="goldcoast_daily_7_30pm",
+            name="Gold Coast Daily 7:30 PM",
+            description="Scrape Gold Coast IT jobs at 7:30 PM",
+            params=SeekSpiderParams(
+                region="Gold Coast",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=19, minute=30, timezone=PERTH_TZ),
+        ),
+
+        # Hobart - Daily 7:45 AM & 7:45 PM
+        Trigger(
+            id="hobart_daily_7_45am",
+            name="Hobart Daily 7:45 AM",
+            description="Scrape Hobart IT jobs at 7:45 AM",
+            params=SeekSpiderParams(
+                region="Hobart",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=7, minute=45, timezone=PERTH_TZ),
+        ),
+        Trigger(
+            id="hobart_daily_7_45pm",
+            name="Hobart Daily 7:45 PM",
+            description="Scrape Hobart IT jobs at 7:45 PM",
+            params=SeekSpiderParams(
+                region="Hobart",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=19, minute=45, timezone=PERTH_TZ),
+        ),
+
+        # Darwin - Daily 8:00 AM & 8:00 PM
+        Trigger(
+            id="darwin_daily_8am",
+            name="Darwin Daily 8:00 AM",
+            description="Scrape Darwin IT jobs at 8:00 AM",
+            params=SeekSpiderParams(
+                region="Darwin",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=8, minute=0, timezone=PERTH_TZ),
+        ),
+        Trigger(
+            id="darwin_daily_8pm",
+            name="Darwin Daily 8:00 PM",
+            description="Scrape Darwin IT jobs at 8:00 PM",
+            params=SeekSpiderParams(
+                region="Darwin",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=20, minute=0, timezone=PERTH_TZ),
+        ),
     ],
 )
 
@@ -553,68 +625,166 @@ register_pipeline(
             schedule=CronTrigger(hour=21, minute=0, timezone=PERTH_TZ),
         ),
 
-        # Sydney - 9:05 AM & 9:05 PM
+        # Sydney - 9:00 AM
         Trigger(
             id="sydney_9am",
-            name="Sydney 9:05 AM Backfill",
-            description="Backfill missing job descriptions for Sydney at 9:05 AM",
+            name="Sydney 9:00 AM Backfill",
+            description="Backfill missing job descriptions for Sydney at 9:00 AM",
             params=BackfillParams(
                 limit=None,
                 delay=5.0,
                 headless=True,
                 region="Sydney",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=9, minute=0, timezone=PERTH_TZ),
+        ),
+        # Sydney - 2:30 PM
+        Trigger(
+            id="sydney_2_30pm",
+            name="Sydney 2:30 PM Backfill",
+            description="Backfill missing job descriptions for Sydney at 2:30 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Sydney",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=14, minute=30, timezone=PERTH_TZ),
+        ),
+        # Sydney - 3:30 PM
+        Trigger(
+            id="sydney_3_30pm",
+            name="Sydney 3:30 PM Backfill",
+            description="Backfill missing job descriptions for Sydney at 3:30 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Sydney",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=15, minute=30, timezone=PERTH_TZ),
+        ),
+        # Sydney - 5:30 PM
+        Trigger(
+            id="sydney_5_30pm",
+            name="Sydney 5:30 PM Backfill",
+            description="Backfill missing job descriptions for Sydney at 5:30 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Sydney",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=17, minute=30, timezone=PERTH_TZ),
+        ),
+        # Sydney - 9:00 PM
+        Trigger(
+            id="sydney_9pm",
+            name="Sydney 9:00 PM Backfill",
+            description="Backfill missing job descriptions for Sydney at 9:00 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Sydney",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=21, minute=0, timezone=PERTH_TZ),
+        ),
+
+        # Melbourne - 9:05 AM
+        Trigger(
+            id="melbourne_9am",
+            name="Melbourne 9:05 AM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 9:05 AM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Melbourne",
                 include_inactive=False,
                 skip_ai=False,
                 restart_interval=30,
             ),
             schedule=CronTrigger(hour=9, minute=5, timezone=PERTH_TZ),
         ),
+        # Melbourne - 2:35 PM
         Trigger(
-            id="sydney_9pm",
-            name="Sydney 9:05 PM Backfill",
-            description="Backfill missing job descriptions for Sydney at 9:05 PM",
+            id="melbourne_2_35pm",
+            name="Melbourne 2:35 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 2:35 PM",
             params=BackfillParams(
                 limit=None,
                 delay=5.0,
                 headless=True,
-                region="Sydney",
+                region="Melbourne",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=14, minute=35, timezone=PERTH_TZ),
+        ),
+        # Melbourne - 3:35 PM
+        Trigger(
+            id="melbourne_3_35pm",
+            name="Melbourne 3:35 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 3:35 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Melbourne",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=15, minute=35, timezone=PERTH_TZ),
+        ),
+        # Melbourne - 5:35 PM
+        Trigger(
+            id="melbourne_5_35pm",
+            name="Melbourne 5:35 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 5:35 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Melbourne",
+                include_inactive=False,
+                skip_ai=False,
+                restart_interval=30,
+            ),
+            schedule=CronTrigger(hour=17, minute=35, timezone=PERTH_TZ),
+        ),
+        # Melbourne - 9:05 PM
+        Trigger(
+            id="melbourne_9pm",
+            name="Melbourne 9:05 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 9:05 PM",
+            params=BackfillParams(
+                limit=None,
+                delay=5.0,
+                headless=True,
+                region="Melbourne",
                 include_inactive=False,
                 skip_ai=False,
                 restart_interval=30,
             ),
             schedule=CronTrigger(hour=21, minute=5, timezone=PERTH_TZ),
-        ),
-
-        # Melbourne - 9:10 AM & 9:10 PM
-        Trigger(
-            id="melbourne_9am",
-            name="Melbourne 9:10 AM Backfill",
-            description="Backfill missing job descriptions for Melbourne at 9:10 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Melbourne",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=10, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="melbourne_9pm",
-            name="Melbourne 9:10 PM Backfill",
-            description="Backfill missing job descriptions for Melbourne at 9:10 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Melbourne",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=10, timezone=PERTH_TZ),
         ),
 
         # Brisbane - 9:15 AM & 9:15 PM

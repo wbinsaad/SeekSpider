@@ -295,11 +295,33 @@ class JobDescriptionBackfiller:
             driver.get(url)
             time.sleep(3)
 
+            # Check for Cloudflare challenge with improved detection
             page_source = driver.page_source
-            if 'challenge' in page_source.lower() or 'cf-browser-verification' in page_source.lower():
-                self.logger.warning("  Cloudflare challenge detected, waiting...")
-                time.sleep(10)
-                page_source = driver.page_source
+            cloudflare_indicators = [
+                'challenge',
+                'cf-browser-verification',
+                'cf-challenge',
+                'ray id',
+                'checking your browser',
+                'just a moment'
+            ]
+
+            is_cloudflare = any(indicator in page_source.lower() for indicator in cloudflare_indicators)
+
+            if is_cloudflare:
+                self.logger.warning("  Cloudflare challenge detected, waiting for resolution...")
+                # Wait longer and check multiple times
+                max_wait_attempts = 3
+                for attempt in range(max_wait_attempts):
+                    time.sleep(8)  # Increased wait time
+                    page_source = driver.page_source
+                    is_cloudflare = any(indicator in page_source.lower() for indicator in cloudflare_indicators)
+                    if not is_cloudflare:
+                        self.logger.info(f"  Cloudflare challenge resolved after {(attempt + 1) * 8} seconds")
+                        break
+                else:
+                    self.logger.warning("  Cloudflare challenge still present after waiting")
+                    return None, None, 'cloudflare_blocked'
 
             soup = BeautifulSoup(page_source, 'lxml')
 
@@ -475,11 +497,12 @@ class JobDescriptionBackfiller:
         if self.config.enable_async_ai:
             self.logger.info("-" * 50)
             self.logger.info("AI ANALYSIS (async)")
-            self.logger.info(f"Tech stack analyzed: {ai_stats['ai_analyzed']}")
-            self.logger.info(f"Tech stack failures: {ai_stats['ai_failed']}")
-            self.logger.info(f"Salary normalized: {ai_stats['salary_normalized']}")
-            self.logger.info(f"Salary skipped (no pay range): {ai_stats['salary_skipped']}")
-            self.logger.info(f"Salary failures: {ai_stats['salary_failed']}")
+            self.logger.info(f"Tech stack analyzed: {ai_stats.get('tech_analyzed', 0)}")
+            self.logger.info(f"Tech stack failures: {ai_stats.get('tech_failed', 0)}")
+            self.logger.info(f"Tech stack skipped: {ai_stats.get('tech_skipped', 0)}")
+            self.logger.info(f"Salary normalized: {ai_stats.get('salary_normalized', 0)}")
+            self.logger.info(f"Salary skipped (no pay range): {ai_stats.get('salary_skipped', 0)}")
+            self.logger.info(f"Salary failures: {ai_stats.get('salary_failed', 0)}")
 
         self.logger.info("=" * 50)
 

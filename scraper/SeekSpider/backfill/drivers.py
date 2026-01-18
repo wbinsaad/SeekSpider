@@ -128,9 +128,26 @@ class DriverManager:
             options.add_argument('--headless=new')
 
         self._add_common_options(options)
-        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+
+        # Enhanced anti-detection measures
+        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+        options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
         options.add_experimental_option('useAutomationExtension', False)
+
+        # Additional stealth options
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=IsolateOrigins,site-per-process')
+
+        # Preferences to appear more like a real browser
+        prefs = {
+            'profile.default_content_setting_values.notifications': 2,
+            'credentials_enable_service': False,
+            'profile.password_manager_enabled': False,
+            'profile.default_content_settings.popups': 0,
+        }
+        options.add_experimental_option('prefs', prefs)
+
         options.binary_location = chromium_path
 
         self.logger.info(f"Using Chromium at: {chromium_path}")
@@ -144,6 +161,15 @@ class DriverManager:
 
         driver = webdriver.Chrome(service=service, options=options)
         driver.set_page_load_timeout(self.config.page_load_timeout)
+
+        # Execute CDP commands to hide webdriver
+        try:
+            driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+                "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+            })
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        except Exception as e:
+            self.logger.warning(f"Failed to apply stealth scripts: {e}")
 
         self.logger.info(f"Chrome driver initialized (headless={self.config.headless}, xvfb={self._xvfb_started})")
         return driver

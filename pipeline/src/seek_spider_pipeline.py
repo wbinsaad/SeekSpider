@@ -57,7 +57,7 @@ class SeekSpiderParams(BaseModel):
     """Parameters for Seek Spider"""
 
     region: REGIONS = Field(
-        default="Perth",
+        default="Melbourne",
         description="Australian region to search for jobs"
     )
     classification: CLASSIFICATIONS = Field(
@@ -209,30 +209,6 @@ register_pipeline(
     tasks=[run_seek_spider],
     params=SeekSpiderParams,
     triggers=[
-        # Perth - Daily 6 AM & 6 PM
-        Trigger(
-            id="perth_daily_6am",
-            name="Perth Daily 6 AM",
-            description="Scrape Perth IT jobs at 6:00 AM",
-            params=SeekSpiderParams(
-                region="Perth",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=6, minute=0, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="perth_daily_6pm",
-            name="Perth Daily 6 PM",
-            description="Scrape Perth IT jobs at 6:00 PM",
-            params=SeekSpiderParams(
-                region="Perth",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=18, minute=0, timezone=PERTH_TZ),
-        ),
-
         # Sydney - Daily 12 PM
         Trigger(
             id="sydney_daily_12pm",
@@ -260,149 +236,6 @@ register_pipeline(
             schedule=CronTrigger(hour=12, minute=30, timezone=PERTH_TZ),
         ),
 
-        # Brisbane - Daily 6 AM & 6 PM
-        Trigger(
-            id="brisbane_daily_6am",
-            name="Brisbane Daily 6 AM",
-            description="Scrape Brisbane IT jobs at 6:00 AM",
-            params=SeekSpiderParams(
-                region="Brisbane",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=6, minute=45, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="brisbane_daily_6pm",
-            name="Brisbane Daily 6 PM",
-            description="Scrape Brisbane IT jobs at 6:00 PM",
-            params=SeekSpiderParams(
-                region="Brisbane",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=18, minute=45, timezone=PERTH_TZ),
-        ),
-
-        # Adelaide - Daily 7 AM & 7 PM
-        Trigger(
-            id="adelaide_daily_7am",
-            name="Adelaide Daily 7 AM",
-            description="Scrape Adelaide IT jobs at 7:00 AM",
-            params=SeekSpiderParams(
-                region="Adelaide",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=7, minute=0, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="adelaide_daily_7pm",
-            name="Adelaide Daily 7 PM",
-            description="Scrape Adelaide IT jobs at 7:00 PM",
-            params=SeekSpiderParams(
-                region="Adelaide",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=19, minute=0, timezone=PERTH_TZ),
-        ),
-
-        # Canberra - Daily 7 AM & 7 PM
-        Trigger(
-            id="canberra_daily_7am",
-            name="Canberra Daily 7 AM",
-            description="Scrape Canberra IT jobs at 7:00 AM",
-            params=SeekSpiderParams(
-                region="Canberra",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=7, minute=15, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="canberra_daily_7pm",
-            name="Canberra Daily 7 PM",
-            description="Scrape Canberra IT jobs at 7:00 PM",
-            params=SeekSpiderParams(
-                region="Canberra",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=19, minute=15, timezone=PERTH_TZ),
-        ),
-
-        # Gold Coast - Daily 7:30 AM & 7:30 PM
-        Trigger(
-            id="goldcoast_daily_7_30am",
-            name="Gold Coast Daily 7:30 AM",
-            description="Scrape Gold Coast IT jobs at 7:30 AM",
-            params=SeekSpiderParams(
-                region="Gold Coast",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=7, minute=30, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="goldcoast_daily_7_30pm",
-            name="Gold Coast Daily 7:30 PM",
-            description="Scrape Gold Coast IT jobs at 7:30 PM",
-            params=SeekSpiderParams(
-                region="Gold Coast",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=19, minute=30, timezone=PERTH_TZ),
-        ),
-
-        # Hobart - Daily 7:45 AM & 7:45 PM
-        Trigger(
-            id="hobart_daily_7_45am",
-            name="Hobart Daily 7:45 AM",
-            description="Scrape Hobart IT jobs at 7:45 AM",
-            params=SeekSpiderParams(
-                region="Hobart",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=7, minute=45, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="hobart_daily_7_45pm",
-            name="Hobart Daily 7:45 PM",
-            description="Scrape Hobart IT jobs at 7:45 PM",
-            params=SeekSpiderParams(
-                region="Hobart",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=19, minute=45, timezone=PERTH_TZ),
-        ),
-
-        # Darwin - Daily 8:00 AM & 8:00 PM
-        Trigger(
-            id="darwin_daily_8am",
-            name="Darwin Daily 8:00 AM",
-            description="Scrape Darwin IT jobs at 8:00 AM",
-            params=SeekSpiderParams(
-                region="Darwin",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=8, minute=0, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="darwin_daily_8pm",
-            name="Darwin Daily 8:00 PM",
-            description="Scrape Darwin IT jobs at 8:00 PM",
-            params=SeekSpiderParams(
-                region="Darwin",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=20, minute=0, timezone=PERTH_TZ),
-        ),
     ],
 )
 

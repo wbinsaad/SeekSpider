@@ -74,8 +74,7 @@ RUN pip install --no-cache-dir \
     selenium \
     pyvirtualdisplay
 
-# Create directories for data and logs
-RUN mkdir -p /app/data /app/logs
+RUN mkdir -p /app/data /app/logs /app/output
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/

@@ -76,6 +76,7 @@ class SeekSpider(scrapy.Spider):
             'subclassification': '',
             'include': 'seodata',
             'locale': 'en-AU',
+            'daterange': '1'
         }
 
         self.logger.info(f"Spider initialized - Region: {self.region}, Location: {self.location}, Classification: {self.classification}")

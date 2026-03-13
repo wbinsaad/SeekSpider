@@ -1,103 +1,117 @@
-# Multi-stage Dockerfile for SeekSpider
-# Seek job scraper with Plombery task scheduler
+# syntax=docker/dockerfile:1
 
-# Stage 1: Build Frontend
-FROM node:20-alpine AS frontend-builder
+############################
+# Stage 1: Frontend deps
+############################
+FROM node:20-alpine AS frontend-deps
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 
 WORKDIR /app/frontend
 
-# Copy frontend package files
+# Keep pnpm version explicit, same as current behavior
+RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
+
+# Copy only dependency metadata first for better cache reuse
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Pre-fetch packages into pnpm store; designed by pnpm for Docker builds
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm fetch
 
-# Copy frontend source code
+############################
+# Stage 2: Build frontend
+############################
+FROM node:20-alpine AS frontend-builder
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+# Build-time memory knob.
+# Default kept conservative for low-memory hosts; override at build time if needed:
+# docker build --build-arg NODE_OPTIONS="--max-old-space-size=1024" ...
+ARG NODE_OPTIONS="--max-old-space-size=768"
+ENV NODE_OPTIONS=$NODE_OPTIONS
+
+WORKDIR /app/frontend
+
+RUN corepack enable && corepack prepare pnpm@10.19.0 --activate
+
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+
+# Reuse the fetched store and install from it
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prefer-offline
+
 COPY frontend/ ./
 
-# Build frontend
 RUN pnpm build
 
-# Stage 2: Build Python Application
-FROM python:3.11-slim
+############################
+# Stage 3: Runtime
+############################
+FROM python:3.11-slim AS runtime
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies including Chrome and virtual display
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libxml2-dev \
-    libxslt-dev \
-    curl \
-    wget \
-    gnupg \
-    xvfb \
-    xauth \
-    && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/pipeline:/app:/app/src:/app/scraper:${PYTHONPATH}
+ENV SCRAPY_SETTINGS_MODULE=SeekSpider.settings
+ENV TZ=Australia/Perth
 
-# Install Chromium (works on both amd64 and arm64)
-RUN apt-get update && apt-get install -y \
+# Install runtime/system packages in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    gcc \
+    gnupg \
+    libxml2-dev \
+    libxslt-dev \
+    wget \
+    xauth \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone
 
-# Copy Python project files
-COPY pyproject.toml setup.cfg MANIFEST.in ./
+# Copy Python dependency metadata first
+COPY pyproject.toml setup.cfg MANIFEST.in requirements.txt ./
 
-# Copy frontend build artifacts from previous stage
-COPY --from=frontend-builder /app/src/plombery/static ./src/plombery/static
-
-# Copy Python source code
+# Copy Python package source needed by editable install
 COPY src/ ./src/
 
-# Install Python dependencies (Plombery)
+# Install Python deps in a single layer
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir \
+      -e . \
+      -r requirements.txt \
+      pandas \
+      python-dateutil \
+      pyvirtualdisplay \
+      selenium \
+      undetected-chromedriver
 
-# Copy pipeline and scraper code
+# Copy frontend build artifacts from previous stage
+# Preserve the current path assumption from your existing Dockerfile.
+COPY --from=frontend-builder /app/src/plombery/static ./src/plombery/static
+
+# Copy application code that changes more often after dependency layers
 COPY pipeline/ ./pipeline/
 COPY scraper/ ./scraper/
-COPY requirements.txt ./
-
-# Install scraper requirements (Scrapy, etc.)
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install additional pipeline requirements
-RUN pip install --no-cache-dir \
-    python-dateutil \
-    pandas \
-    undetected-chromedriver \
-    selenium \
-    pyvirtualdisplay
 
 RUN mkdir -p /app/data /app/logs /app/output
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Set timezone to Perth
-ENV TZ=Australia/Perth
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Set environment variables
-ENV PYTHONPATH=/app/pipeline:/app:/app/src:/app/scraper:${PYTHONPATH}
-ENV PYTHONUNBUFFERED=1
-ENV SCRAPY_SETTINGS_MODULE=SeekSpider.settings
-
-# Expose port
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Set working directory for application
 WORKDIR /app/pipeline
 
-# Use entrypoint script
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

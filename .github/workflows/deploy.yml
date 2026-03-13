@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: Deploy to Production
 
 on:
   push:
@@ -7,30 +7,31 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-
+    runs-on: self-hosted
     steps:
-      - name: Deploy to Server via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
-            cd ~/SeekSpider
+      
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-            # Pull latest code
-            git fetch origin main
-            git reset --hard origin/main
+      - name: Set up environment variables
+        run: |
+          echo "POSTGRESQL_HOST=${{ vars.POSTGRESQL_HOST }}" > ./.env
+          echo "POSTGRESQL_PORT=${{ vars.POSTGRESQL_PORT }}" >> ./.env
+          echo "POSTGRESQL_USER=${{ vars.POSTGRESQL_USER }}" >> ./.env
+          echo "POSTGRESQL_PASSWORD=${{ vars.POSTGRESQL_PASSWORD }}" >> ./.env
+          echo "POSTGRESQL_DATABASE=${{ vars.POSTGRESQL_DATABASE }}" >> ./.env
+          echo "POSTGRESQL_TABLE=${{ vars.POSTGRESQL_TABLE }}" >> ./.env
 
-            # Rebuild and restart containers
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+      - name: Build and run containers
+        run: |
+          export IMAGE_NAME="jobs-app:${GITHUB_SHA}"
+          docker compose down
+          
+          # Clean up old unused images
+          docker image prune -f
 
-            # Clean up old images
-            docker image prune -f
+          docker compose build --no-cache
+          docker compose up -d --remove-orphans
 
-            # Show status
-            docker-compose ps
+      - name: Show running containers
+        run: docker ps

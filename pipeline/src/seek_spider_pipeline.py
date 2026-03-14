@@ -209,33 +209,58 @@ register_pipeline(
     tasks=[run_seek_spider],
     params=SeekSpiderParams,
     triggers=[
-        # Sydney - Daily 12 PM
-        Trigger(
-            id="sydney_daily_12pm",
-            name="Sydney Daily 12 PM",
-            description="Scrape Sydney IT jobs at 12:00 AM",
-            params=SeekSpiderParams(
-                region="Sydney",
-                classification="6281",
-                run_post_processing=True,
-            ),
-            schedule=CronTrigger(hour=12, minute=00, timezone=PERTH_TZ),
-        ),
 
-
-        # Melbourne - Daily 12 PM
+        # Melbourne - Daily 09 AM
         Trigger(
-            id="melbourne_daily_12pm",
-            name="Melbourne Daily 12 PM",
-            description="Scrape Melbourne IT jobs at 12:00 PM",
+            id="melbourne_daily_09am",
+            name="Melbourne Daily 09 AM",
+            description="Scrape Melbourne IT jobs at 09:00 AM",
             params=SeekSpiderParams(
                 region="Melbourne",
                 classification="6281",
                 run_post_processing=True,
             ),
-            schedule=CronTrigger(hour=12, minute=30, timezone=PERTH_TZ),
+            schedule=CronTrigger(hour=9, minute=00, timezone=PERTH_TZ),
         ),
 
+        # Melbourne - Daily 12 PM
+        Trigger(
+            id="melbourne_daily_12pm",
+            name="Melbourne Daily 12 PM",
+            description="Scrape Melbourne IT jobs at 12:45 PM",
+            params=SeekSpiderParams(
+                region="Melbourne",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=12, minute=45, timezone=PERTH_TZ),
+        ),
+
+        # Melbourne - Daily 05 PM
+        Trigger(
+            id="melbourne_daily_05pm",
+            name="Melbourne Daily 05 PM",
+            description="Scrape Melbourne IT jobs at 05:25 PM",
+            params=SeekSpiderParams(
+                region="Melbourne",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=17, minute=25, timezone=PERTH_TZ),
+        ),
+
+        # Melbourne - Daily 10 PM
+        Trigger(
+            id="melbourne_daily_10pm",
+            name="Melbourne Daily 10 PM",
+            description="Scrape Melbourne IT jobs at 10:25 PM",
+            params=SeekSpiderParams(
+                region="Melbourne",
+                classification="6281",
+                run_post_processing=True,
+            ),
+            schedule=CronTrigger(hour=22, minute=25, timezone=PERTH_TZ),
+        ),
     ],
 )
 
@@ -426,124 +451,12 @@ register_pipeline(
     tasks=[run_backfill],
     params=BackfillParams,
     triggers=[
-        # Perth - 9:00 AM & 9:00 PM
-        Trigger(
-            id="perth_9am",
-            name="Perth 9 AM Backfill",
-            description="Backfill missing job descriptions for Perth at 9:00 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Perth",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=0, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="perth_9pm",
-            name="Perth 9 PM Backfill",
-            description="Backfill missing job descriptions for Perth at 9:00 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Perth",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=0, timezone=PERTH_TZ),
-        ),
 
-        # Sydney - 9:00 AM
-        Trigger(
-            id="sydney_9am",
-            name="Sydney 9:00 AM Backfill",
-            description="Backfill missing job descriptions for Sydney at 9:00 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Sydney",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=0, timezone=PERTH_TZ),
-        ),
-        # Sydney - 2:30 PM
-        Trigger(
-            id="sydney_2_30pm",
-            name="Sydney 2:30 PM Backfill",
-            description="Backfill missing job descriptions for Sydney at 2:30 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Sydney",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=14, minute=30, timezone=PERTH_TZ),
-        ),
-        # Sydney - 3:30 PM
-        Trigger(
-            id="sydney_3_30pm",
-            name="Sydney 3:30 PM Backfill",
-            description="Backfill missing job descriptions for Sydney at 3:30 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Sydney",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=15, minute=30, timezone=PERTH_TZ),
-        ),
-        # Sydney - 5:30 PM
-        Trigger(
-            id="sydney_5_30pm",
-            name="Sydney 5:30 PM Backfill",
-            description="Backfill missing job descriptions for Sydney at 5:30 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Sydney",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=17, minute=30, timezone=PERTH_TZ),
-        ),
-        # Sydney - 9:00 PM
-        Trigger(
-            id="sydney_9pm",
-            name="Sydney 9:00 PM Backfill",
-            description="Backfill missing job descriptions for Sydney at 9:00 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Sydney",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=0, timezone=PERTH_TZ),
-        ),
-
-        # Melbourne - 9:05 AM
+        # Melbourne - 9:15 AM
         Trigger(
             id="melbourne_9am",
-            name="Melbourne 9:05 AM Backfill",
-            description="Backfill missing job descriptions for Melbourne at 9:05 AM",
+            name="Melbourne 9:15 AM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 9:15 AM",
             params=BackfillParams(
                 limit=None,
                 delay=5.0,
@@ -553,13 +466,13 @@ register_pipeline(
                 skip_ai=False,
                 restart_interval=30,
             ),
-            schedule=CronTrigger(hour=9, minute=5, timezone=PERTH_TZ),
+            schedule=CronTrigger(hour=9, minute=15, timezone=PERTH_TZ),
         ),
-        # Melbourne - 2:35 PM
+        # Melbourne - 12:35 PM
         Trigger(
-            id="melbourne_2_35pm",
-            name="Melbourne 2:35 PM Backfill",
-            description="Backfill missing job descriptions for Melbourne at 2:35 PM",
+            id="melbourne_12_35pm",
+            name="Melbourne 12:35 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 12:35 PM",
             params=BackfillParams(
                 limit=None,
                 delay=5.0,
@@ -569,7 +482,7 @@ register_pipeline(
                 skip_ai=False,
                 restart_interval=30,
             ),
-            schedule=CronTrigger(hour=14, minute=35, timezone=PERTH_TZ),
+            schedule=CronTrigger(hour=12, minute=35, timezone=PERTH_TZ),
         ),
         # Melbourne - 3:35 PM
         Trigger(
@@ -603,11 +516,11 @@ register_pipeline(
             ),
             schedule=CronTrigger(hour=17, minute=35, timezone=PERTH_TZ),
         ),
-        # Melbourne - 9:05 PM
+        # Melbourne - 10:45 PM
         Trigger(
-            id="melbourne_9pm",
-            name="Melbourne 9:05 PM Backfill",
-            description="Backfill missing job descriptions for Melbourne at 9:05 PM",
+            id="melbourne_10pm",
+            name="Melbourne 10:45 PM Backfill",
+            description="Backfill missing job descriptions for Melbourne at 10:45 PM",
             params=BackfillParams(
                 limit=None,
                 delay=5.0,
@@ -617,397 +530,8 @@ register_pipeline(
                 skip_ai=False,
                 restart_interval=30,
             ),
-            schedule=CronTrigger(hour=21, minute=5, timezone=PERTH_TZ),
+            schedule=CronTrigger(hour=22, minute=45, timezone=PERTH_TZ),
         ),
 
-        # Brisbane - 9:15 AM & 9:15 PM
-        Trigger(
-            id="brisbane_9am",
-            name="Brisbane 9:15 AM Backfill",
-            description="Backfill missing job descriptions for Brisbane at 9:15 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Brisbane",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=15, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="brisbane_9pm",
-            name="Brisbane 9:15 PM Backfill",
-            description="Backfill missing job descriptions for Brisbane at 9:15 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Brisbane",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=15, timezone=PERTH_TZ),
-        ),
-
-        # Gold Coast - 9:20 AM & 9:20 PM
-        Trigger(
-            id="goldcoast_9am",
-            name="Gold Coast 9:20 AM Backfill",
-            description="Backfill missing job descriptions for Gold Coast at 9:20 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Gold Coast",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=20, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="goldcoast_9pm",
-            name="Gold Coast 9:20 PM Backfill",
-            description="Backfill missing job descriptions for Gold Coast at 9:20 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Gold Coast",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=20, timezone=PERTH_TZ),
-        ),
-
-        # Adelaide - 9:25 AM & 9:25 PM
-        Trigger(
-            id="adelaide_9am",
-            name="Adelaide 9:25 AM Backfill",
-            description="Backfill missing job descriptions for Adelaide at 9:25 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Adelaide",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=25, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="adelaide_9pm",
-            name="Adelaide 9:25 PM Backfill",
-            description="Backfill missing job descriptions for Adelaide at 9:25 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Adelaide",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=25, timezone=PERTH_TZ),
-        ),
-
-        # Canberra - 9:30 AM & 9:30 PM
-        Trigger(
-            id="canberra_9am",
-            name="Canberra 9:30 AM Backfill",
-            description="Backfill missing job descriptions for Canberra at 9:30 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Canberra",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=30, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="canberra_9pm",
-            name="Canberra 9:30 PM Backfill",
-            description="Backfill missing job descriptions for Canberra at 9:30 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Canberra",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=30, timezone=PERTH_TZ),
-        ),
-
-        # Hobart - 9:35 AM & 9:35 PM
-        Trigger(
-            id="hobart_9am",
-            name="Hobart 9:35 AM Backfill",
-            description="Backfill missing job descriptions for Hobart at 9:35 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Hobart",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=35, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="hobart_9pm",
-            name="Hobart 9:35 PM Backfill",
-            description="Backfill missing job descriptions for Hobart at 9:35 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Hobart",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=35, timezone=PERTH_TZ),
-        ),
-
-        # Darwin - 9:40 AM & 9:40 PM
-        Trigger(
-            id="darwin_9am",
-            name="Darwin 9:40 AM Backfill",
-            description="Backfill missing job descriptions for Darwin at 9:40 AM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Darwin",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=9, minute=40, timezone=PERTH_TZ),
-        ),
-        Trigger(
-            id="darwin_9pm",
-            name="Darwin 9:40 PM Backfill",
-            description="Backfill missing job descriptions for Darwin at 9:40 PM",
-            params=BackfillParams(
-                limit=None,
-                delay=5.0,
-                headless=True,
-                region="Darwin",
-                include_inactive=False,
-                skip_ai=False,
-                restart_interval=30,
-            ),
-            schedule=CronTrigger(hour=21, minute=40, timezone=PERTH_TZ),
-        ),
-    ],
-)
-
-
-# ============================================================================
-# AI Analysis Pipeline
-# ============================================================================
-
-ANALYSIS_TYPES = Literal["all", "tech_stack", "salary"]
-
-
-class AIAnalysisParams(BaseModel):
-    """Parameters for AI Analysis task"""
-
-    analysis_type: ANALYSIS_TYPES = Field(
-        default="all",
-        description="Type of analysis to run (all, tech_stack, salary)"
-    )
-    region: Optional[REGIONS] = Field(
-        default=None,
-        description="Region for output organization"
-    )
-    region_filter: Optional[REGIONS] = Field(
-        default=None,
-        description="Filter jobs by region"
-    )
-    limit: Optional[int] = Field(
-        default=None,
-        description="Maximum number of jobs to process (default: no limit)",
-        ge=1,
-    )
-    include_existing: bool = Field(
-        default=False,
-        description="Re-analyze jobs that already have analysis"
-    )
-
-
-@task
-async def run_ai_analysis(params: AIAnalysisParams) -> dict:
-    """Run AI analysis on job descriptions"""
-
-    logger = get_logger()
-    logger.info("Starting AI Analysis")
-    logger.info(f"Parameters: type={params.analysis_type}, region={params.region}")
-    logger.info(f"Region filter: {params.region_filter or 'All regions'}")
-    logger.info(f"Limit: {params.limit or 'No limit'}, Include existing: {params.include_existing}")
-
-    # Get current run_id from context
-    pipeline_run = run_context.get()
-    run_id = pipeline_run.id if pipeline_run else None
-
-    process = None
-    try:
-        # Set up environment
-        env = os.environ.copy()
-        env['PYTHONPATH'] = f"{PROJECT_ROOT}:{SCRAPER_DIR}:{env.get('PYTHONPATH', '')}"
-
-        # Build ai_analysis command using module
-        ai_analysis_cwd = os.path.join(SCRAPER_DIR, 'SeekSpider')
-        cmd = [sys.executable, '-m', 'ai_analysis']
-
-        cmd.extend(['--type', params.analysis_type])
-
-        if params.region:
-            cmd.extend(['--region', params.region])
-
-        if params.region_filter:
-            cmd.extend(['--region-filter', params.region_filter])
-
-        if params.limit:
-            cmd.extend(['--limit', str(params.limit)])
-
-        if params.include_existing:
-            cmd.append('--include-existing')
-
-        logger.info(f"Running command: {' '.join(cmd)}")
-        logger.info(f"Working directory: {ai_analysis_cwd}")
-
-        # Run the ai_analysis module using async subprocess
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=ai_analysis_cwd,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-
-        # Register the process if we have a run_id
-        if run_id:
-            _running_processes[run_id] = process
-            logger.info(f"Registered process for run #{run_id} (PID: {process.pid})")
-
-        # Stream output to logger asynchronously
-        while True:
-            line = await process.stdout.readline()
-            if not line:
-                break
-            line = line.decode('utf-8').strip()
-            if line:
-                logger.info(line)
-
-        # Wait for process to complete
-        return_code = await process.wait()
-
-        if return_code != 0:
-            # Check if it was cancelled
-            if return_code == -signal.SIGTERM or return_code == -signal.SIGKILL:
-                logger.info(f"AI Analysis was cancelled (return code: {return_code})")
-                return {
-                    "status": "cancelled",
-                    "message": "AI Analysis was cancelled by user",
-                    "timestamp": datetime.now().isoformat()
-                }
-
-            return {
-                "status": "error",
-                "error": f"AI Analysis exited with code {return_code}",
-                "timestamp": datetime.now().isoformat()
-            }
-
-        result = {
-            "status": "success",
-            "message": "AI Analysis completed successfully",
-            "analysis_type": params.analysis_type,
-            "region": params.region or "All regions",
-            "region_filter": params.region_filter or "All regions",
-            "limit": params.limit,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info("AI Analysis completed successfully")
-        return result
-
-    except asyncio.CancelledError:
-        # Task was cancelled
-        logger.info("Task was cancelled")
-        if process and process.returncode is None:
-            logger.info(f"Terminating process PID: {process.pid}")
-            try:
-                process.terminate()
-                await asyncio.wait_for(process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning(f"Process did not terminate gracefully, killing PID: {process.pid}")
-                process.kill()
-                await process.wait()
-
-        # Re-raise the exception so executor marks the task as cancelled
-        raise
-
-    except Exception as e:
-        logger.error(f"AI Analysis failed: {str(e)}", exc_info=True)
-        return {
-            "status": "error",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-    finally:
-        # Always unregister the process
-        if run_id and run_id in _running_processes:
-            del _running_processes[run_id]
-            logger.info(f"Unregistered process for run #{run_id}")
-
-
-register_pipeline(
-    id="ai_analysis",
-    description="Run AI analysis on job descriptions (tech stack extraction, salary normalization)",
-    tasks=[run_ai_analysis],
-    params=AIAnalysisParams,
-    triggers=[
-        # Daily at 10:00 AM - analyze all regions
-        Trigger(
-            id="daily_10am",
-            name="Daily 10 AM AI Analysis",
-            description="Run AI analysis on all jobs at 10:00 AM",
-            params=AIAnalysisParams(
-                analysis_type="all",
-                region=None,
-                region_filter=None,
-                limit=None,
-                include_existing=False,
-            ),
-            schedule=CronTrigger(hour=10, minute=0, timezone=PERTH_TZ),
-        ),
-        # Daily at 10:00 PM - analyze all regions
-        Trigger(
-            id="daily_10pm",
-            name="Daily 10 PM AI Analysis",
-            description="Run AI analysis on all jobs at 10:00 PM",
-            params=AIAnalysisParams(
-                analysis_type="all",
-                region=None,
-                region_filter=None,
-                limit=None,
-                include_existing=False,
-            ),
-            schedule=CronTrigger(hour=22, minute=0, timezone=PERTH_TZ),
-        ),
     ],
 )

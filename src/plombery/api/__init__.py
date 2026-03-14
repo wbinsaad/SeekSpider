@@ -5,7 +5,7 @@ from plombery._version import __version__
 from plombery.websocket import asgi
 from plombery.api.middlewares import SPAStaticFiles, setup_cors
 from plombery.api.routers import pipelines, runs, tokens
-
+from src.api.jobs import router as jobs_router
 
 API_PREFIX = "/api"
 
@@ -23,5 +23,5 @@ app.include_router(runs.router, prefix=API_PREFIX)
 app.include_router(tokens.router, prefix=API_PREFIX)
 # Note: api_tokens router removed - external API now uses Supabase authentication
 app.include_router(build_auth_router(app), prefix=API_PREFIX)
-
+app.include_router(jobs_router)
 app.mount("/", SPAStaticFiles(api_prefix=API_PREFIX))

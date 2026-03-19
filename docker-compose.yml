@@ -34,7 +34,6 @@ services:
       # set true to force one run at container startup (for testing)
       RUN_ON_START: "true"
     volumes:
-      - ./output:/app/output
       - ./data:/app/data
       - ./scraper/.env:/app/scraper/.env:ro
     restart: unless-stopped

@@ -32,7 +32,7 @@ services:
       SCRAPY_PROJECT_DIR: /app/scraper
       LOG_LEVEL: INFO
       # set true to force one run at container startup (for testing)
-      RUN_ON_START: "false"
+      RUN_ON_START: "true"
     volumes:
       - ./output:/app/output
       - ./data:/app/data

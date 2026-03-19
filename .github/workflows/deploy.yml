@@ -15,12 +15,12 @@ jobs:
 
       - name: Set up environment variables
         run: |
-          echo "POSTGRESQL_HOST=${{ vars.POSTGRESQL_HOST }}" > ./.env
-          echo "POSTGRESQL_PORT=${{ vars.POSTGRESQL_PORT }}" >> ./.env
-          echo "POSTGRESQL_USER=${{ vars.POSTGRESQL_USER }}" >> ./.env
-          echo "POSTGRESQL_PASSWORD=${{ vars.POSTGRESQL_PASSWORD }}" >> ./.env
-          echo "POSTGRESQL_DATABASE=${{ vars.POSTGRESQL_DATABASE }}" >> ./.env
-          echo "POSTGRESQL_TABLE=${{ vars.POSTGRESQL_TABLE }}" >> ./.env
+          echo "POSTGRESQL_HOST=${{ vars.POSTGRESQL_HOST }}" > ./scraper/.env
+          echo "POSTGRESQL_PORT=${{ vars.POSTGRESQL_PORT }}" >> ./scraper/.env
+          echo "POSTGRESQL_USER=${{ vars.POSTGRESQL_USER }}" >> ./scraper/.env
+          echo "POSTGRESQL_PASSWORD=${{ vars.POSTGRESQL_PASSWORD }}" >> ./scraper/.env
+          echo "POSTGRESQL_DATABASE=${{ vars.POSTGRESQL_DATABASE }}" >> ./scraper/.env
+          echo "POSTGRESQL_TABLE=${{ vars.POSTGRESQL_TABLE }}" >> ./scraper/.env
 
       - name: Build and run containers
         run: |
@@ -29,7 +29,7 @@ jobs:
           
           # Clean up old unused images
           docker image prune -f
-          docker compose build --build-arg NODE_OPTIONS="--max-old-space-size=2048"
+          docker compose build --no-cache
           docker compose up -d --remove-orphans
 
       - name: Show running containers

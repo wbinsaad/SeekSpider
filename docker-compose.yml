@@ -39,6 +39,24 @@ services:
       - ./scraper/.env:/app/scraper/.env:ro
     restart: unless-stopped
 
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: seekspider-api
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: seekuser
+      POSTGRES_PASSWORD: seekpass
+      POSTGRES_DB: seekdb
+      POSTGRES_TABLE: seek_jobs
+    ports:
+      - "127.0.0.1:6059:8000"
+    restart: unless-stopped
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: seekspider-pgadmin

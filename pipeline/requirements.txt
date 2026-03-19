@@ -1,3 +1,0 @@
--e ..
-python-dateutil
-pandas

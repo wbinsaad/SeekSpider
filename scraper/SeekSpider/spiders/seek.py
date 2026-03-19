@@ -12,10 +12,6 @@ from SeekSpider.core.config import config
 from SeekSpider.core.database import DatabaseManager
 from SeekSpider.core.regions import AUSTRALIAN_REGIONS, DEFAULT_REGION, get_seek_location, is_valid_region
 from SeekSpider.items import SeekspiderItem
-from SeekSpider.utils.salary_normalizer import SalaryNormalizer
-from SeekSpider.utils.tech_frequency_analyzer import TechStatsAnalyzer
-from SeekSpider.utils.tech_stack_analyzer import TechStackAnalyzer
-
 
 class SeekSpider(scrapy.Spider):
     name = "seek"
@@ -175,8 +171,8 @@ class SeekSpider(scrapy.Spider):
             self.logger.info(f'Next Subclass: {self.current_category} ({category_name}), URL: {next_url}')
             yield self.make_requests_from_url(self.base_url)
         else:
-            self.logger.info('No more categories to scrape')
-            raise CloseSpider('Finished scraping all categories')
+            self.logger.info('No more categories to scrape; waiting for pending detail requests to finish')
+            return
 
     def parse_job(self, data):
         """Parse individual job listing and request detail page"""
@@ -289,14 +285,6 @@ class SeekSpider(scrapy.Spider):
 
         # Run AI analysis
         self.logger.info("Running AI analysis...")
-        tech_analyzer = TechStackAnalyzer(self.db, self.ai_client, self.logger)
-        salary_normalizer = SalaryNormalizer(self.db, self.ai_client, self.logger)
-        stats_analyzer = TechStatsAnalyzer(self.db, self.logger)
-
-        # Run analysis
-        tech_analyzer.process_all_jobs()
-        salary_normalizer.process_all_jobs()
-        stats_analyzer.process_all_jobs()
 
         self.logger.info("Post-processing complete")
 

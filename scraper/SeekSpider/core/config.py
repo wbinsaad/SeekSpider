@@ -1,11 +1,39 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 
+def _load_environment_file():
+    """Load .env from common runtime locations and return the loaded path."""
+    current_file = Path(__file__).resolve()
+    scraper_root = current_file.parents[2]  # .../scraper
+    project_root = current_file.parents[3]  # .../SeekSpider_Waleed
+
+    candidate_paths = [
+        Path.cwd() / '.env',
+        scraper_root / '.env',
+        project_root / '.env',
+    ]
+
+    seen = set()
+    for env_path in candidate_paths:
+        resolved = env_path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+
+        if env_path.is_file():
+            load_dotenv(dotenv_path=env_path, override=False)
+            return str(env_path)
+
+    load_dotenv(override=False)
+    return None
+
+
 class Config:
     def __init__(self):
-        load_dotenv()
+        self.ENV_FILE_PATH = _load_environment_file()
 
         # Database settings - support both naming conventions
         self.POSTGRESQL_HOST = os.getenv('POSTGRESQL_HOST') or os.getenv('POSTGRES_HOST')

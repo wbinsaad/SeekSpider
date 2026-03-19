@@ -13,43 +13,32 @@ services:
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
 
-  seekspider:
+  scheduler:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: seekspider
+    container_name: seekspider-scheduler
     depends_on:
       - postgres
-    ports:
-      - "127.0.0.1:6059:8000"
+    env_file:
+      - ./scraper/.env
     environment:
-      POSTGRESQL_HOST: postgres
-      POSTGRESQL_PORT: 5432
-      POSTGRESQL_USER: seekuser
-      POSTGRESQL_PASSWORD: seekpass
-      POSTGRESQL_DATABASE: seekdb
-      POSTGRESQL_TABLE: seek_jobs
-      AI_API_KEY: ${AI_API_KEY}
-      AI_API_URL: ${AI_API_URL}
-      AI_MODEL: ${AI_MODEL}
-      PYTHONPATH: /app/pipeline:/app:/app/src:/app/scraper
-      PYTHONUNBUFFERED: 1
-      TZ: Australia/Perth
-      OUTPUT_PATH: /app/output
-      DATA_PATH: /app/data
-      DATABASE_URL: sqlite:////app/data/plombery.db
+      SCHEDULER_TIMEZONE: Australia/Melbourne
+      WEEKDAY_SCHEDULE_TIMES: "08:07,10:02,12:13,14:06,16:07,18:31,22:09"
+      WEEKEND_SCHEDULE_TIMES: "09:41,14:37,17:31,21:51"
+      SPIDER_NAME: seek
+      SPIDER_ARGS: "region=Melbourne"
+      SCRAPY_BIN: scrapy
+      SCRAPY_PROJECT_DIR: /app/scraper
+      LOG_LEVEL: INFO
+      # set true to force one run at container startup (for testing)
+      RUN_ON_START: "false"
     volumes:
-      - ./.env:/app/.env:ro
       - ./output:/app/output
       - ./data:/app/data
+      - ./scraper/.env:/app/scraper/.env:ro
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-  
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: seekspider-pgadmin

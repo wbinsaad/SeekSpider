@@ -28,8 +28,7 @@ jobs:
           docker compose down
           
           # Clean up old unused images
-          docker image prune -f
-          docker compose build --no-cache
+          docker compose build
           docker compose up -d --remove-orphans
 
       - name: Show running containers

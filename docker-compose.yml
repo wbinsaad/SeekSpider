@@ -33,6 +33,8 @@ services:
       SCRAPY_PROJECT_DIR: /app/scraper
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       RUN_ON_START: "true"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/lib/seek-app/data:/app/data
     restart: unless-stopped
@@ -62,6 +64,8 @@ services:
       POSTGRES_TABLE: ${POSTGRES_TABLE:-${POSTGRESQL_TABLE:-${DATABASE_TABLE:?DATABASE_TABLE is required}}}
     ports:
       - "127.0.0.1:6059:8000"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/lib/seek-app/data:/app/data
     restart: unless-stopped

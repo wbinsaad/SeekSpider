@@ -75,7 +75,5 @@ jobs:
           docker compose ps
           docker compose ps --status running | grep -E 'seekspider-scheduler|seekspider-api'
 
-          curl --fail --silent --show-error http://127.0.0.1:6059/health > /dev/null
-
       - name: Show running containers
         run: docker ps

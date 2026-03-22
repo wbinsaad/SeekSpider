@@ -1,6 +1,8 @@
 import logging
 import os
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import psycopg2
@@ -9,12 +11,20 @@ from pydantic import BaseModel
 from psycopg2.extras import RealDictCursor
 
 # Configuration
-DB_HOST = os.getenv('POSTGRES_HOST', 'postgres')
-DB_PORT = int(os.getenv('POSTGRES_PORT', 5432))
-DB_USER = os.getenv('POSTGRES_USER', 'seekuser')
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'seekpass')
-DB_NAME = os.getenv('POSTGRES_DB', 'seekdb')
-DB_TABLE = os.getenv('POSTGRES_TABLE', 'seek_jobs')
+DATABASE_ENGINE = (os.getenv('DATABASE_ENGINE') or 'postgres').strip().lower()
+SQLITE_DB_PATH = os.getenv('SQLITE_DB_PATH')
+
+DB_HOST = os.getenv('POSTGRES_HOST') or os.getenv('POSTGRESQL_HOST') or 'postgres'
+DB_PORT = int((os.getenv('POSTGRES_PORT') or os.getenv('POSTGRESQL_PORT') or 5432))
+DB_USER = os.getenv('POSTGRES_USER') or os.getenv('POSTGRESQL_USER') or 'seekuser'
+DB_PASSWORD = os.getenv('POSTGRES_PASSWORD') or os.getenv('POSTGRESQL_PASSWORD') or 'seekpass'
+DB_NAME = os.getenv('POSTGRES_DB') or os.getenv('POSTGRESQL_DATABASE') or 'seekdb'
+DB_TABLE = (
+    os.getenv('DATABASE_TABLE')
+    or os.getenv('POSTGRES_TABLE')
+    or os.getenv('POSTGRESQL_TABLE')
+    or 'seek_jobs'
+)
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +72,19 @@ class RegionResponse(BaseModel):
 def get_db_connection():
     """Create a new database connection"""
     try:
+        if DATABASE_ENGINE == 'sqlite':
+            if not SQLITE_DB_PATH:
+                raise ValueError('SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite')
+
+            project_root = Path(__file__).resolve().parents[1]
+            sqlite_path = Path(SQLITE_DB_PATH)
+            if not sqlite_path.is_absolute():
+                sqlite_path = project_root / sqlite_path
+
+            conn = sqlite3.connect(sqlite_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
         conn = psycopg2.connect(
             host=DB_HOST,
             port=DB_PORT,
@@ -72,9 +95,38 @@ def get_db_connection():
         )
         conn.set_session(autocommit=True)
         return conn
-    except psycopg2.Error as e:
+    except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         raise
+
+
+def execute_query(sql: str, params=None, fetch: str = 'all'):
+    """Execute a query with engine-aware placeholders and row conversion."""
+    params = tuple(params or ())
+    query = sql.replace('%s', '?') if DATABASE_ENGINE == 'sqlite' else sql
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(query, params)
+        if fetch == 'none':
+            return None
+
+        if fetch == 'one':
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            if DATABASE_ENGINE == 'sqlite':
+                return dict(row)
+            return row
+
+        rows = cursor.fetchall()
+        if DATABASE_ENGINE == 'sqlite':
+            return [dict(row) for row in rows]
+        return rows
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # Routes
@@ -82,11 +134,7 @@ def get_db_connection():
 async def health_check():
     """Health check endpoint"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.close()
-        conn.close()
+        execute_query("SELECT 1", fetch='one')
         return {"status": "healthy"}
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -97,14 +145,10 @@ async def health_check():
 async def get_regions():
     """Get list of available regions"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute(f'SELECT DISTINCT "Region" FROM "{DB_TABLE}" WHERE "Region" IS NOT NULL ORDER BY "Region"')
-        regions = [row['Region'] for row in cursor.fetchall()]
-        
-        cursor.close()
-        conn.close()
+        rows = execute_query(
+            f'SELECT DISTINCT "Region" FROM "{DB_TABLE}" WHERE "Region" IS NOT NULL ORDER BY "Region"'
+        )
+        regions = [row['Region'] for row in rows]
         
         return {"regions": regions}
     except Exception as e:
@@ -143,9 +187,6 @@ async def get_jobs(
     - is_active: Filter by active status (true/false)
     """
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         # Build WHERE clause
         conditions = []
         params = []
@@ -156,7 +197,10 @@ async def get_jobs(
         
         if search:
             search_term = f"%{search}%"
-            conditions.append('("JobTitle" ILIKE %s OR "BusinessName" ILIKE %s)')
+            if DATABASE_ENGINE == 'sqlite':
+                conditions.append('(LOWER("JobTitle") LIKE LOWER(%s) OR LOWER("BusinessName") LIKE LOWER(%s))')
+            else:
+                conditions.append('("JobTitle" ILIKE %s OR "BusinessName" ILIKE %s)')
             params.extend([search_term, search_term])
         
         if work_type:
@@ -197,10 +241,14 @@ async def get_jobs(
         
         # Get total count
         count_sql = f'SELECT COUNT(*) as total FROM "{DB_TABLE}" WHERE {where_clause}'
-        cursor.execute(count_sql, params)
-        total = cursor.fetchone()['total']
+        total = execute_query(count_sql, params, fetch='one')['total']
         
         # Get paginated results
+        if DATABASE_ENGINE == 'sqlite':
+            order_clause = f'ORDER BY ({sort_column} IS NULL) ASC, {sort_column} {sort_order_sql}'
+        else:
+            order_clause = f'ORDER BY {sort_column} {sort_order_sql} NULLS LAST'
+
         query_sql = f"""
             SELECT 
                 "Id" as id,
@@ -221,18 +269,13 @@ async def get_jobs(
                 "IsNew" as is_new
             FROM "{DB_TABLE}"
             WHERE {where_clause}
-            ORDER BY {sort_column} {sort_order_sql} NULLS LAST
+            {order_clause}
             LIMIT %s OFFSET %s
         """
         params.extend([limit, offset])
-        
-        cursor.execute(query_sql, params)
-        rows = cursor.fetchall()
+        rows = execute_query(query_sql, params)
         
         items = [JobItem(**row) for row in rows]
-        
-        cursor.close()
-        conn.close()
         
         return JobsResponse(total=total, limit=limit, offset=offset, items=items)
     
@@ -245,9 +288,6 @@ async def get_jobs(
 async def get_job(job_id: str):
     """Get a specific job by ID"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         query_sql = f"""
             SELECT 
                 "Id" as id,
@@ -269,12 +309,7 @@ async def get_job(job_id: str):
             FROM "{DB_TABLE}"
             WHERE "Id" = %s
         """
-        
-        cursor.execute(query_sql, (job_id,))
-        row = cursor.fetchone()
-        
-        cursor.close()
-        conn.close()
+        row = execute_query(query_sql, (job_id,), fetch='one')
         
         if not row:
             raise HTTPException(status_code=404, detail="Job not found")

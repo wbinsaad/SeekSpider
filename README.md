@@ -73,16 +73,26 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment Variables
 
-Copy `.env.example` to `.env` and fill in your configuration:
+Copy `scraper/.env.example` to `scraper/.env` and fill in your configuration:
 
 ```env
-# Database configuration
+# Database configuration (PostgreSQL mode - default)
+DATABASE_ENGINE=postgres
 POSTGRESQL_HOST=your_host
 POSTGRESQL_PORT=5432
 POSTGRESQL_USER=your_user
 POSTGRESQL_PASSWORD=your_password
 POSTGRESQL_DATABASE=your_database
+DATABASE_TABLE=seek_jobs
 POSTGRESQL_TABLE=seek_jobs
+
+# Backward-compatible aliases are still supported:
+# POSTGRES_HOST / POSTGRES_PORT / POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB / POSTGRES_TABLE
+
+# Database configuration (SQLite mode)
+# DATABASE_ENGINE=sqlite
+# SQLITE_DB_PATH=./data/seek_jobs.db
+# DATABASE_TABLE=seek_jobs
 
 # AI API configuration (for post-processing)
 # Multiple keys supported (comma-separated) - auto-switches on rate limit or insufficient balance
@@ -90,6 +100,10 @@ AI_API_KEYS=key1,key2,key3
 AI_API_URL=https://api.siliconflow.cn/v1/chat/completions
 AI_MODEL=deepseek-ai/DeepSeek-V2.5
 ```
+
+Validation behavior:
+- `DATABASE_ENGINE=postgres`: requires current PostgreSQL fields and table name.
+- `DATABASE_ENGINE=sqlite`: requires `SQLITE_DB_PATH` and table name.
 
 ### 3. Run
 
@@ -106,6 +120,62 @@ scrapy crawl seek -a region=Melbourne
 ```
 
 Access the Web UI at `http://localhost:8000`.
+
+## Run Modes
+
+### SQLite Quick Start (recommended for local)
+
+1. Set `.env` to SQLite mode:
+
+```env
+DATABASE_ENGINE=sqlite
+SQLITE_DB_PATH=./data/seek_jobs.sqlite3
+DATABASE_TABLE=seek_jobs
+```
+
+2. Start services (SQLite-first compose):
+
+```bash
+docker compose up -d scheduler api
+```
+
+3. Verify API:
+
+```bash
+curl http://127.0.0.1:6059/health
+curl http://127.0.0.1:6059/regions
+curl "http://127.0.0.1:6059/jobs?limit=5"
+```
+
+Notes:
+- SQLite schema is auto-initialized on startup (table + indexes) for empty DB files.
+- The DB file is shared between containers through `./data:/app/data`.
+
+### PostgreSQL Compatibility Mode (optional)
+
+1. Set `.env` to PostgreSQL mode:
+
+```env
+DATABASE_ENGINE=postgres
+POSTGRESQL_HOST=postgres
+POSTGRESQL_PORT=5432
+POSTGRESQL_USER=seekuser
+POSTGRESQL_PASSWORD=seekpass
+POSTGRESQL_DATABASE=seekdb
+DATABASE_TABLE=seek_jobs
+```
+
+2. Start with PostgreSQL profile:
+
+```bash
+docker compose --profile postgres up -d
+```
+
+3. API remains at:
+
+```bash
+http://127.0.0.1:6059
+```
 
 ## Seek Spider Pipeline
 
@@ -163,13 +233,75 @@ The spider stores data in PostgreSQL with the following main fields:
 
 ### Database Migration
 
-To add the Region column to an existing database:
+Current migration/initialization paths:
+
+- SQLite: no manual schema migration needed for first run; startup auto-creates `seek_jobs` + indexes.
+- PostgreSQL: initialization SQL is in `docker/postgres/init/001-init-seek_jobs.sql` (applied by postgres container entrypoint).
+- Backfill job descriptions (both engines):
 
 ```bash
 cd scraper
-python -m SeekSpider.scripts.add_region_column --dry-run  # Preview changes
-python -m SeekSpider.scripts.add_region_column            # Execute migration
+python -m SeekSpider.backfill --region Melbourne --limit 100
 ```
+
+Useful backfill variants:
+
+```bash
+python -m SeekSpider.backfill --region-filter Melbourne --workers 3
+python -m SeekSpider.backfill --include-inactive --limit 50
+```
+
+## Validation Checklist
+
+Run these checks after setup/migration:
+
+1. Spider run creates/updates rows
+	- Run spider once for a region and confirm rows exist in `seek_jobs`.
+	- Re-run same region and confirm existing IDs are updated (not duplicated).
+
+2. Expiry marking works
+	- After a new run, verify jobs not in current scrape are marked inactive for that region.
+	- Confirm `IsActive` becomes false/0 and `ExpiryDate` is set.
+
+3. Backfill updates `JobDescription`
+	- Run backfill with a small limit.
+	- Confirm `JobDescription` is populated for processed rows.
+
+4. API endpoints return expected results
+	- `GET /health` returns healthy
+	- `GET /regions` returns known regions
+	- `GET /jobs` supports filters/pagination/sort
+	- `GET /jobs/{id}` returns the expected row
+
+## SQLite Troubleshooting
+
+### `database is locked` / write lock contention
+
+Symptoms:
+- Errors like `sqlite3.OperationalError: database is locked`
+- Frequent concurrent writers (scraper + backfill + other tools)
+
+Mitigations:
+- Prefer a single active writer process when possible.
+- Keep write transactions short (already handled in code paths that commit quickly).
+- Use WAL mode for better read/write concurrency.
+
+Enable WAL mode:
+
+```bash
+sqlite3 ./data/seek_jobs.sqlite3 "PRAGMA journal_mode=WAL;"
+sqlite3 ./data/seek_jobs.sqlite3 "PRAGMA synchronous=NORMAL;"
+```
+
+Check current mode:
+
+```bash
+sqlite3 ./data/seek_jobs.sqlite3 "PRAGMA journal_mode;"
+```
+
+Known limitations in SQLite mode:
+- Less suitable than PostgreSQL for heavy concurrent write workloads.
+- Large backfill + scraping at the same time can increase lock contention.
 
 ## Docker Deployment
 

@@ -1,4 +1,6 @@
+import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg2
 
@@ -8,6 +10,51 @@ class DatabaseManager:
 
         self.config = config
         self.logger = None
+        self.database_engine = getattr(self.config, 'DATABASE_ENGINE', 'postgres')
+        self.table_name = getattr(self.config, 'DATABASE_TABLE', self.config.POSTGRESQL_TABLE)
+        self.sqlite_db_path = None
+
+        self._initialize_sqlite_schema_if_needed()
+
+    def _initialize_sqlite_schema_if_needed(self):
+        if self.database_engine != 'sqlite':
+            return
+
+        sqlite_db_path = getattr(self.config, 'SQLITE_DB_PATH', None)
+        if not sqlite_db_path:
+            raise ValueError('SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite')
+
+        current_file = Path(__file__).resolve()
+        project_root = current_file.parents[3]
+        schema_path = project_root / 'docker' / 'sqlite' / 'init' / '001-init-seek_jobs.sqlite.sql'
+
+        if not schema_path.is_file():
+            raise FileNotFoundError(f'SQLite schema file not found: {schema_path}')
+
+        sqlite_path = self._resolve_sqlite_db_path(project_root)
+
+        sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with schema_path.open('r', encoding='utf-8') as schema_file:
+            schema_sql = schema_file.read()
+
+        with sqlite3.connect(sqlite_path) as conn:
+            conn.executescript(schema_sql)
+
+        self.sqlite_db_path = sqlite_path
+        self.log('info', f'SQLite schema initialized at: {sqlite_path}')
+
+    def _resolve_sqlite_db_path(self, project_root):
+        sqlite_path = Path(self.config.SQLITE_DB_PATH)
+        if not sqlite_path.is_absolute():
+            sqlite_path = project_root / sqlite_path
+        return sqlite_path
+
+    def _normalize_query_and_params(self, query, params):
+        normalized_params = tuple(params or ())
+        if self.database_engine == 'sqlite':
+            return query.replace('%s', '?'), normalized_params
+        return query, normalized_params
 
     def set_logger(self, logger):
         self.logger = logger
@@ -20,17 +67,24 @@ class DatabaseManager:
     def get_connection(self):
         conn = None
         try:
-            conn = psycopg2.connect(
-                host=self.config.POSTGRESQL_HOST,
-                port=self.config.POSTGRESQL_PORT,
-                user=self.config.POSTGRESQL_USER,
-                password=self.config.POSTGRESQL_PASSWORD,
-                database=self.config.POSTGRESQL_DATABASE
-            )
-            # Set timezone to Perth for all timestamp operations
-            with conn.cursor() as cur:
-                cur.execute("SET timezone = 'Australia/Perth'")
-            self.log('debug', 'Database connection established (timezone: Australia/Perth)')
+            if self.database_engine == 'sqlite':
+                if not self.sqlite_db_path:
+                    current_file = Path(__file__).resolve()
+                    project_root = current_file.parents[3]
+                    self.sqlite_db_path = self._resolve_sqlite_db_path(project_root)
+                conn = sqlite3.connect(self.sqlite_db_path)
+                self.log('debug', f'Database connection established (engine: sqlite, path: {self.sqlite_db_path})')
+            else:
+                conn = psycopg2.connect(
+                    host=self.config.POSTGRESQL_HOST,
+                    port=self.config.POSTGRESQL_PORT,
+                    user=self.config.POSTGRESQL_USER,
+                    password=self.config.POSTGRESQL_PASSWORD,
+                    database=self.config.POSTGRESQL_DATABASE
+                )
+                with conn.cursor() as cur:
+                    cur.execute("SET timezone = 'Australia/Perth'")
+                self.log('debug', 'Database connection established (engine: postgres, timezone: Australia/Perth)')
             yield conn
         except Exception as e:
             self.log('error', f'Database connection error: {str(e)}')
@@ -57,7 +111,8 @@ class DatabaseManager:
     def execute_query(self, query, params=None):
         with self.get_cursor() as cur:
             try:
-                cur.execute(query, params or ())
+                normalized_query, normalized_params = self._normalize_query_and_params(query, params)
+                cur.execute(normalized_query, normalized_params)
                 return cur.fetchall()
             except Exception as e:
                 self.log('error', f'Query execution error: {str(e)}')
@@ -66,14 +121,15 @@ class DatabaseManager:
     def execute_update(self, query, params=None):
         with self.get_cursor() as cur:
             try:
-                cur.execute(query, params or ())
+                normalized_query, normalized_params = self._normalize_query_and_params(query, params)
+                cur.execute(normalized_query, normalized_params)
                 return cur.rowcount
             except Exception as e:
                 self.log('error', f'Update execution error: {str(e)}')
                 raise
 
     def get_existing_job_ids(self):
-        query = f'SELECT "Id" FROM "{self.config.POSTGRESQL_TABLE}"'
+        query = f'SELECT "Id" FROM "{self.table_name}"'
         results = self.execute_query(query)
         return {str(row[0]) for row in results}
 
@@ -81,7 +137,7 @@ class DatabaseManager:
         columns = ', '.join([f'"{k}"' for k in job_data.keys()])
         placeholders = ', '.join(['%s'] * len(job_data))
         query = f'''
-            INSERT INTO "{self.config.POSTGRESQL_TABLE}" ({columns})
+            INSERT INTO "{self.table_name}" ({columns})
             VALUES ({placeholders})
         '''
         self.execute_update(query, list(job_data.values()))
@@ -111,16 +167,16 @@ class DatabaseManager:
             # Add condition to only update if JobDescription is currently empty
             # This is an atomic check-and-set operation at the database level
             query = f'''
-                UPDATE "{self.config.POSTGRESQL_TABLE}"
-                SET {set_clause}, "UpdatedAt" = now()
+                UPDATE "{self.table_name}"
+                SET {set_clause}, "UpdatedAt" = CURRENT_TIMESTAMP
                 WHERE "Id" = %s
                 AND ("JobDescription" IS NULL OR "JobDescription" = '' OR "JobDescription" = 'None')
             '''
         else:
             # For other updates, no special condition needed
             query = f'''
-                UPDATE "{self.config.POSTGRESQL_TABLE}"
-                SET {set_clause}, "UpdatedAt" = now()
+                UPDATE "{self.table_name}"
+                SET {set_clause}, "UpdatedAt" = CURRENT_TIMESTAMP
                 WHERE "Id" = %s
             '''
 
@@ -137,23 +193,26 @@ class DatabaseManager:
         if not job_ids:
             return 0
 
+        id_placeholders = ', '.join(['%s'] * len(job_ids))
+        active_value = 1 if self.database_engine == 'sqlite' else 'TRUE'
+        inactive_value = 0 if self.database_engine == 'sqlite' else 'FALSE'
+
         query = f'''
-            UPDATE "{self.config.POSTGRESQL_TABLE}"
-            SET "IsActive" = FALSE, 
-                "UpdatedAt" = now(),
-                "ExpiryDate" = now()
-            WHERE "Id" = ANY(%s::integer[])
-            AND "IsActive" = TRUE
+            UPDATE "{self.table_name}"
+            SET "IsActive" = {inactive_value},
+                "UpdatedAt" = CURRENT_TIMESTAMP,
+                "ExpiryDate" = CURRENT_TIMESTAMP
+            WHERE "Id" IN ({id_placeholders})
+            AND "IsActive" = {active_value}
         '''
-        job_ids_int = [int(job_id) for job_id in job_ids]
-        affected = self.execute_update(query, (job_ids_int,))
+        affected = self.execute_update(query, [str(job_id) for job_id in job_ids])
         self.log('info', f'Marked {affected} jobs as inactive')
         return affected
 
     def get_unprocessed_jobs(self):
         query = f'''
             SELECT "Id", "JobDescription" 
-            FROM "{self.config.POSTGRESQL_TABLE}" 
+            FROM "{self.table_name}" 
             WHERE "TechStack" IS NULL 
             AND "JobDescription" IS NOT NULL
         '''

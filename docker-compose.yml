@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15
     container_name: seekspider-postgres
+    profiles: ["postgres"]
     environment:
       POSTGRES_USER: seekuser
       POSTGRES_PASSWORD: seekpass
@@ -18,11 +19,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: seekspider-scheduler
-    depends_on:
-      - postgres
     env_file:
       - ./scraper/.env
     environment:
+      DATABASE_ENGINE: ${DATABASE_ENGINE:-sqlite}
+      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/seek_jobs.sqlite3}
+      DATABASE_TABLE: ${DATABASE_TABLE:-seek_jobs}
       SCHEDULER_TIMEZONE: Australia/Melbourne
       WEEKDAY_SCHEDULE_TIMES: "08:07,10:02,12:13,14:06,16:07,18:31,22:09"
       WEEKEND_SCHEDULE_TIMES: "09:41,14:37,17:31,21:51"
@@ -43,22 +45,26 @@ services:
       context: .
       dockerfile: api/Dockerfile
     container_name: seekspider-api
-    depends_on:
-      - postgres
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: seekuser
-      POSTGRES_PASSWORD: seekpass
-      POSTGRES_DB: seekdb
-      POSTGRES_TABLE: seek_jobs
+      DATABASE_ENGINE: ${DATABASE_ENGINE:-sqlite}
+      SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/seek_jobs.sqlite3}
+      DATABASE_TABLE: ${DATABASE_TABLE:-seek_jobs}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-seekuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seekpass}
+      POSTGRES_DB: ${POSTGRES_DB:-seekdb}
+      POSTGRES_TABLE: ${POSTGRES_TABLE:-seek_jobs}
     ports:
       - "127.0.0.1:6059:8000"
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
 
   pgadmin:
     image: dpage/pgadmin4
     container_name: seekspider-pgadmin
+    profiles: ["postgres"]
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin

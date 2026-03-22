@@ -1,12 +1,15 @@
 import json
 import logging
 import os
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 import psycopg2
 from scrapy import signals
 
 from SeekSpider.core.config import config
+from SeekSpider.core.database import DatabaseManager
 from SeekSpider.core.output_manager import OutputManager
 
 
@@ -91,6 +94,28 @@ class JsonExportPipeline:
 
 class SeekspiderPipeline(object):
 
+    def __init__(self):
+        self.database_engine = getattr(config, 'DATABASE_ENGINE', 'postgres')
+        self.table_name = getattr(config, 'DATABASE_TABLE', config.POSTGRESQL_TABLE)
+
+    def _execute(self, query, params=()):
+        sql = query
+        if self.database_engine == 'sqlite':
+            sql = sql.replace('%s', '?')
+        self.cursor.execute(sql, params)
+
+    def _resolve_sqlite_db_path(self):
+        sqlite_db_path = getattr(config, 'SQLITE_DB_PATH', None)
+        if not sqlite_db_path:
+            raise ValueError('SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite')
+
+        current_file = Path(__file__).resolve()
+        project_root = current_file.parents[2]
+        sqlite_path = Path(sqlite_db_path)
+        if not sqlite_path.is_absolute():
+            sqlite_path = project_root / sqlite_path
+        return sqlite_path
+
     @classmethod
     def from_crawler(cls, crawler):
         # Create a pipeline instance
@@ -100,25 +125,33 @@ class SeekspiderPipeline(object):
         return instance
 
     def open_spider(self, spider):
-        self.connection = psycopg2.connect(
-            host=config.POSTGRESQL_HOST,
-            user=config.POSTGRESQL_USER,
-            password=config.POSTGRESQL_PASSWORD,
-            database=config.POSTGRESQL_DATABASE,
-            port=config.POSTGRESQL_PORT
-        )
+        if self.database_engine == 'sqlite':
+            db_manager = DatabaseManager(config)
+            sqlite_path = db_manager.sqlite_db_path or self._resolve_sqlite_db_path()
+            self.connection = sqlite3.connect(sqlite_path)
+            spider.logger.info(f"Connected to database engine: sqlite ({sqlite_path})")
+        else:
+            self.connection = psycopg2.connect(
+                host=config.POSTGRESQL_HOST,
+                user=config.POSTGRESQL_USER,
+                password=config.POSTGRESQL_PASSWORD,
+                database=config.POSTGRESQL_DATABASE,
+                port=config.POSTGRESQL_PORT
+            )
+            spider.logger.info("Connected to database engine: postgres")
+
         self.cursor = self.connection.cursor()
 
-        # Set timezone to Perth for all timestamp operations
-        self.cursor.execute("SET timezone = 'Australia/Perth'")
+        if self.database_engine == 'postgres':
+            self.cursor.execute("SET timezone = 'Australia/Perth'")
 
         # Store current region for later use in spider_closed
         self.current_region = getattr(spider, 'region', 'Perth')
 
         # Load job IDs for the current region into memory
         try:
-            self.cursor.execute(
-                f'SELECT "Id" FROM "{config.POSTGRESQL_TABLE}" WHERE "Region" = %s OR "Region" IS NULL',
+            self._execute(
+                f'SELECT "Id" FROM "{self.table_name}" WHERE "Region" = %s OR "Region" IS NULL',
                 (self.current_region,)
             )
             self.existing_job_ids = set(str(row[0]) for row in self.cursor.fetchall())
@@ -151,12 +184,12 @@ class SeekspiderPipeline(object):
                     "Url" = %s,
                     "AdvertiserId" = %s,
                     "JobType" = %s,
-                    "UpdatedAt" = now(),
+                    "UpdatedAt" = CURRENT_TIMESTAMP,
                     "PostedDate" = %s,
                     "ExpiryDate" = NULL,
-                    "IsActive" = TRUE
+                    "IsActive" = {}
                 WHERE "Id" = %s
-            """.format(config.POSTGRESQL_TABLE)
+            """.format(self.table_name, 1 if self.database_engine == 'sqlite' else 'TRUE')
 
             try:
                 advertiser_id = item.get('advertiser_id')
@@ -178,7 +211,7 @@ class SeekspiderPipeline(object):
                     job_id
                 )
 
-                self.cursor.execute(update_sql, params)
+                self._execute(update_sql, params)
                 self.connection.commit()
                 # spider.logger.info(f"Job ID: {job_id} updated successfully.")
 
@@ -209,9 +242,9 @@ class SeekspiderPipeline(object):
                 "PostedDate"
             )
             VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now(),now(),true,%s
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,{},%s
             )
-            """.format(config.POSTGRESQL_TABLE)
+            """.format(self.table_name, 1 if self.database_engine == 'sqlite' else 'TRUE')
 
         try:
             advertiser_id = item.get('advertiser_id')
@@ -233,7 +266,7 @@ class SeekspiderPipeline(object):
                 item.get('posted_date')
             )
 
-            self.cursor.execute(insert_sql, params)
+            self._execute(insert_sql, params)
             self.connection.commit()
             spider.logger.info(f"Job ID: {job_id} inserted successfully.")
 
@@ -258,19 +291,24 @@ class SeekspiderPipeline(object):
             sample_invalid_jobs = list(invalid_job_ids)[:10]
             spider.logger.info(f"Sample of jobs not in current scrape: {sample_invalid_jobs}")
 
+            id_placeholders = ', '.join(['%s'] * len(invalid_job_ids))
+            is_active_true = 1 if self.database_engine == 'sqlite' else 'TRUE'
+            is_active_false = 0 if self.database_engine == 'sqlite' else 'FALSE'
+
             # 将不存在的职位标记为失效（只针对当前地区）
             update_expired_sql = f'''
-                UPDATE "{config.POSTGRESQL_TABLE}"
-                SET "IsActive" = FALSE,
-                    "UpdatedAt" = now(),
-                    "ExpiryDate" = now()
-                WHERE "Id" = ANY(%s::integer[])
-                AND "IsActive" = TRUE
+                UPDATE "{self.table_name}"
+                SET "IsActive" = {is_active_false},
+                    "UpdatedAt" = CURRENT_TIMESTAMP,
+                    "ExpiryDate" = CURRENT_TIMESTAMP
+                WHERE "Id" IN ({id_placeholders})
+                AND "IsActive" = {is_active_true}
                 AND ("Region" = %s OR "Region" IS NULL)
             '''
-            # Convert string IDs to integers before passing to SQL
-            invalid_job_ids_int = [int(job_id) for job_id in invalid_job_ids]
-            self.cursor.execute(update_expired_sql, (invalid_job_ids_int, self.current_region))
+
+            params = [str(job_id) for job_id in invalid_job_ids]
+            params.append(self.current_region)
+            self._execute(update_expired_sql, tuple(params))
             expired_rows = self.cursor.rowcount
             self.connection.commit()
             spider.logger.info(f"Updated {expired_rows} jobs to IsActive=False for region: {self.current_region}")

@@ -8,28 +8,74 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    env:
+      DATABASE_ENGINE: ${{ vars.DATABASE_ENGINE }}
+      SQLITE_DB_PATH: ${{ vars.SQLITE_DB_PATH }}
+      DATABASE_TABLE: ${{ vars.DATABASE_TABLE }}
+
+      POSTGRESQL_HOST: ${{ vars.POSTGRESQL_HOST }}
+      POSTGRESQL_PORT: ${{ vars.POSTGRESQL_PORT }}
+      POSTGRESQL_USER: ${{ vars.POSTGRESQL_USER }}
+      POSTGRESQL_DATABASE: ${{ vars.POSTGRESQL_DATABASE }}
+      POSTGRESQL_TABLE: ${{ vars.POSTGRESQL_TABLE }}
+
+      POSTGRESQL_PASSWORD: ${{ vars.POSTGRESQL_PASSWORD }}
+
+      # Optional explicit aliases (set if you use them in Environment vars)
+      POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ vars.POSTGRES_PORT }}
+      POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+      POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+      POSTGRES_TABLE: ${{ vars.POSTGRES_TABLE }}
+      POSTGRES_PASSWORD: ${{ vars.POSTGRES_PASSWORD }}
+
     steps:
-      
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up environment variables
+      - name: Preflight Compose interpolation and required vars
+        shell: bash
         run: |
-          echo "POSTGRESQL_HOST=${{ vars.POSTGRESQL_HOST }}" > ./scraper/.env
-          echo "POSTGRESQL_PORT=${{ vars.POSTGRESQL_PORT }}" >> ./scraper/.env
-          echo "POSTGRESQL_USER=${{ vars.POSTGRESQL_USER }}" >> ./scraper/.env
-          echo "POSTGRESQL_PASSWORD=${{ vars.POSTGRESQL_PASSWORD }}" >> ./scraper/.env
-          echo "POSTGRESQL_DATABASE=${{ vars.POSTGRESQL_DATABASE }}" >> ./scraper/.env
-          echo "POSTGRESQL_TABLE=${{ vars.POSTGRESQL_TABLE }}" >> ./scraper/.env
+          set -euo pipefail
+          docker compose config > /tmp/compose.rendered.yml
+
+          : "${DATABASE_ENGINE:?DATABASE_ENGINE is required}"
+          : "${DATABASE_TABLE:?DATABASE_TABLE is required}"
+
+          if [ "${DATABASE_ENGINE}" = "postgres" ]; then
+            : "${POSTGRESQL_HOST:?POSTGRESQL_HOST is required when DATABASE_ENGINE=postgres}"
+            : "${POSTGRESQL_PORT:?POSTGRESQL_PORT is required when DATABASE_ENGINE=postgres}"
+            : "${POSTGRESQL_USER:?POSTGRESQL_USER is required when DATABASE_ENGINE=postgres}"
+            : "${POSTGRESQL_PASSWORD:?POSTGRESQL_PASSWORD is required when DATABASE_ENGINE=postgres}"
+            : "${POSTGRESQL_DATABASE:?POSTGRESQL_DATABASE is required when DATABASE_ENGINE=postgres}"
+          elif [ "${DATABASE_ENGINE}" = "sqlite" ]; then
+            : "${SQLITE_DB_PATH:?SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite}"
+          else
+            echo "Invalid DATABASE_ENGINE: ${DATABASE_ENGINE}" >&2
+            exit 1
+          fi
 
       - name: Build and run containers
+        shell: bash
         run: |
-          export IMAGE_NAME="jobs-app:${GITHUB_SHA}"
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          export IMAGE_NAME="jobs-app:${GITHUB_SHA}-${TIMESTAMP}"
+
+          echo "Using image: $IMAGE_NAME"
+
           docker compose down
-          
-          # Clean up old unused images
           docker compose build
           docker compose up -d --remove-orphans
+
+      - name: Verify deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose ps
+          docker compose ps --status running | grep -E 'seekspider-scheduler|seekspider-api'
+
+          curl --fail --silent --show-error http://127.0.0.1:6059/health > /dev/null
 
       - name: Show running containers
         run: docker ps

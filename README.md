@@ -73,37 +73,51 @@ pip install -r requirements.txt
 
 ### 2. Configure Environment Variables
 
-Copy `scraper/.env.example` to `scraper/.env` and fill in your configuration:
+#### Local development (optional `.env`)
 
-```env
-# Database configuration (PostgreSQL mode - default)
-DATABASE_ENGINE=postgres
-POSTGRESQL_HOST=your_host
-POSTGRESQL_PORT=5432
-POSTGRESQL_USER=your_user
-POSTGRESQL_PASSWORD=your_password
-POSTGRESQL_DATABASE=your_database
-DATABASE_TABLE=seek_jobs
-POSTGRESQL_TABLE=seek_jobs
+For local convenience, copy `scraper/.env.example` to `scraper/.env` and set values:
 
-# Backward-compatible aliases are still supported:
-# POSTGRES_HOST / POSTGRES_PORT / POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB / POSTGRES_TABLE
-
-# Database configuration (SQLite mode)
-# DATABASE_ENGINE=sqlite
-# SQLITE_DB_PATH=./data/seek_jobs.db
-# DATABASE_TABLE=seek_jobs
-
-# AI API configuration (for post-processing)
-# Multiple keys supported (comma-separated) - auto-switches on rate limit or insufficient balance
-AI_API_KEYS=key1,key2,key3
-AI_API_URL=https://api.siliconflow.cn/v1/chat/completions
-AI_MODEL=deepseek-ai/DeepSeek-V2.5
+```bash
+cp scraper/.env.example scraper/.env
 ```
 
-Validation behavior:
-- `DATABASE_ENGINE=postgres`: requires current PostgreSQL fields and table name.
-- `DATABASE_ENGINE=sqlite`: requires `SQLITE_DB_PATH` and table name.
+This local file is optional and gitignored. Runtime process environment variables take precedence when both are present.
+
+#### Staging/production (GitHub Environment only)
+
+CI/CD does not generate or mount `scraper/.env`. Deployments read values only from GitHub Environment `vars` and `secrets` at runtime.
+
+Use:
+- GitHub `vars` for non-sensitive values (engine, host, port, table, paths).
+- GitHub `secrets` for sensitive values (passwords, API keys).
+
+#### Variable matrix (canonical contract)
+
+| Canonical variable | Aliases | Required when `DATABASE_ENGINE=sqlite` | Required when `DATABASE_ENGINE=postgres` |
+|---|---|---|---|
+| `DATABASE_ENGINE` | - | yes (`sqlite`) | yes (`postgres`) |
+| `SQLITE_DB_PATH` | - | yes | no |
+| `DATABASE_TABLE` | `POSTGRESQL_TABLE`, `POSTGRES_TABLE` | yes | yes |
+| `POSTGRESQL_HOST` | `POSTGRES_HOST` | no | yes |
+| `POSTGRESQL_PORT` | `POSTGRES_PORT` | no | yes |
+| `POSTGRESQL_USER` | `POSTGRES_USER` | no | yes |
+| `POSTGRESQL_PASSWORD` | `POSTGRES_PASSWORD` | no | yes |
+| `POSTGRESQL_DATABASE` | `POSTGRES_DB` | no | yes |
+
+Precedence is canonical first, then aliases for backward compatibility.
+
+#### Troubleshooting
+
+1. **`docker compose config` fails before deploy**
+	- Cause: missing required interpolation variables.
+	- Fix: set missing GitHub Environment `vars`/`secrets` for the target environment.
+
+2. **Startup error: invalid/missing DB configuration**
+	- Cause: selected engine does not have its required variables.
+	- Fix: for `sqlite`, set `SQLITE_DB_PATH` + `DATABASE_TABLE`; for `postgres`, set host/port/user/password/database/table.
+
+3. **Alias confusion**
+	- Fix: prefer canonical `POSTGRESQL_*` names in new config and keep aliases only for compatibility.
 
 ### 3. Run
 

@@ -1,30 +1,29 @@
 services:
-  postgres:
-    image: postgres:15
-    container_name: seekspider-postgres
-    profiles: ["postgres"]
-    environment:
-      POSTGRES_USER: seekuser
-      POSTGRES_PASSWORD: seekpass
-      POSTGRES_DB: seekdb
-    ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
-    restart: unless-stopped
 
   scheduler:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: seekspider-scheduler
-    env_file:
-      - ./scraper/.env
     environment:
-      DATABASE_ENGINE: ${DATABASE_ENGINE:-sqlite}
+      DATABASE_ENGINE: ${DATABASE_ENGINE:?DATABASE_ENGINE is required}
       SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/seek_jobs.sqlite3}
-      DATABASE_TABLE: ${DATABASE_TABLE:-seek_jobs}
+      DATABASE_TABLE: ${DATABASE_TABLE:?DATABASE_TABLE is required}
+
+      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-${POSTGRES_HOST:-}}
+      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-${POSTGRES_PORT:-}}
+      POSTGRESQL_USER: ${POSTGRESQL_USER:-${POSTGRES_USER:-}}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-${POSTGRES_PASSWORD:-}}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-${POSTGRES_DB:-}}
+      POSTGRESQL_TABLE: ${POSTGRESQL_TABLE:-${DATABASE_TABLE:?DATABASE_TABLE is required}}
+
+      POSTGRES_HOST: ${POSTGRES_HOST:-${POSTGRESQL_HOST:-}}
+      POSTGRES_PORT: ${POSTGRES_PORT:-${POSTGRESQL_PORT:-}}
+      POSTGRES_USER: ${POSTGRES_USER:-${POSTGRESQL_USER:-}}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${POSTGRESQL_PASSWORD:-}}
+      POSTGRES_DB: ${POSTGRES_DB:-${POSTGRESQL_DATABASE:-}}
+      POSTGRES_TABLE: ${POSTGRES_TABLE:-${POSTGRESQL_TABLE:-${DATABASE_TABLE:?DATABASE_TABLE is required}}}
+
       SCHEDULER_TIMEZONE: Australia/Melbourne
       WEEKDAY_SCHEDULE_TIMES: "08:07,10:02,12:13,14:06,16:07,18:31,22:09"
       WEEKEND_SCHEDULE_TIMES: "09:41,14:37,17:31,21:51"
@@ -32,12 +31,10 @@ services:
       SPIDER_ARGS: "region=Melbourne"
       SCRAPY_BIN: scrapy
       SCRAPY_PROJECT_DIR: /app/scraper
-      LOG_LEVEL: INFO
-      # set true to force one run at container startup (for testing)
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       RUN_ON_START: "true"
     volumes:
-      - ./data:/app/data
-      - ./scraper/.env:/app/scraper/.env:ro
+      - /var/lib/seek-app/data:/app/data
     restart: unless-stopped
 
   api:
@@ -46,32 +43,25 @@ services:
       dockerfile: api/Dockerfile
     container_name: seekspider-api
     environment:
-      DATABASE_ENGINE: ${DATABASE_ENGINE:-sqlite}
+      DATABASE_ENGINE: ${DATABASE_ENGINE:?DATABASE_ENGINE is required}
       SQLITE_DB_PATH: ${SQLITE_DB_PATH:-/app/data/seek_jobs.sqlite3}
-      DATABASE_TABLE: ${DATABASE_TABLE:-seek_jobs}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_USER: ${POSTGRES_USER:-seekuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seekpass}
-      POSTGRES_DB: ${POSTGRES_DB:-seekdb}
-      POSTGRES_TABLE: ${POSTGRES_TABLE:-seek_jobs}
+      DATABASE_TABLE: ${DATABASE_TABLE:?DATABASE_TABLE is required}
+
+      POSTGRESQL_HOST: ${POSTGRESQL_HOST:-${POSTGRES_HOST:-}}
+      POSTGRESQL_PORT: ${POSTGRESQL_PORT:-${POSTGRES_PORT:-}}
+      POSTGRESQL_USER: ${POSTGRESQL_USER:-${POSTGRES_USER:-}}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-${POSTGRES_PASSWORD:-}}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-${POSTGRES_DB:-}}
+      POSTGRESQL_TABLE: ${POSTGRESQL_TABLE:-${DATABASE_TABLE:?DATABASE_TABLE is required}}
+
+      POSTGRES_HOST: ${POSTGRES_HOST:-${POSTGRESQL_HOST:-}}
+      POSTGRES_PORT: ${POSTGRES_PORT:-${POSTGRESQL_PORT:-}}
+      POSTGRES_USER: ${POSTGRES_USER:-${POSTGRESQL_USER:-}}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-${POSTGRESQL_PASSWORD:-}}
+      POSTGRES_DB: ${POSTGRES_DB:-${POSTGRESQL_DATABASE:-}}
+      POSTGRES_TABLE: ${POSTGRES_TABLE:-${POSTGRESQL_TABLE:-${DATABASE_TABLE:?DATABASE_TABLE is required}}}
     ports:
       - "127.0.0.1:6059:8000"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
-
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: seekspider-pgadmin
-    profiles: ["postgres"]
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "127.0.0.1:5050:80"
-    depends_on:
-      - postgres
-
-volumes:
-  postgres_data:

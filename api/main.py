@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -10,21 +11,107 @@ from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
 from psycopg2.extras import RealDictCursor
 
-# Configuration
-DATABASE_ENGINE = (os.getenv('DATABASE_ENGINE') or 'postgres').strip().lower()
-SQLITE_DB_PATH = os.getenv('SQLITE_DB_PATH')
+@dataclass(frozen=True)
+class ApiConfig:
+    """Canonical DB config with backward-compatible postgres aliases.
 
-DB_HOST = os.getenv('POSTGRES_HOST') or os.getenv('POSTGRESQL_HOST') or 'postgres'
-DB_PORT = int((os.getenv('POSTGRES_PORT') or os.getenv('POSTGRESQL_PORT') or 5432))
-DB_USER = os.getenv('POSTGRES_USER') or os.getenv('POSTGRESQL_USER') or 'seekuser'
-DB_PASSWORD = os.getenv('POSTGRES_PASSWORD') or os.getenv('POSTGRESQL_PASSWORD') or 'seekpass'
-DB_NAME = os.getenv('POSTGRES_DB') or os.getenv('POSTGRESQL_DATABASE') or 'seekdb'
-DB_TABLE = (
-    os.getenv('DATABASE_TABLE')
-    or os.getenv('POSTGRES_TABLE')
-    or os.getenv('POSTGRESQL_TABLE')
-    or 'seek_jobs'
-)
+    Canonical names: DATABASE_ENGINE, SQLITE_DB_PATH, DATABASE_TABLE,
+    POSTGRESQL_HOST/PORT/USER/PASSWORD/DATABASE.
+    Supported aliases: POSTGRES_HOST/PORT/USER/PASSWORD/DB and
+    POSTGRESQL_TABLE/POSTGRES_TABLE for table name.
+    """
+
+    database_engine: str
+    sqlite_db_path: Optional[str]
+    database_table: Optional[str]
+    postgres_host: Optional[str]
+    postgres_port_raw: Optional[str]
+    postgres_port: Optional[int]
+    postgres_user: Optional[str]
+    postgres_password: Optional[str]
+    postgres_database: Optional[str]
+
+
+def _get_first_env(*names: str) -> Optional[str]:
+    for name in names:
+        value = os.getenv(name)
+        if value is not None:
+            value = value.strip()
+            if value:
+                return value
+    return None
+
+
+def _safe_int(value: Optional[str]) -> Optional[int]:
+    if not value:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_api_config() -> ApiConfig:
+    postgres_port_raw = _get_first_env('POSTGRESQL_PORT', 'POSTGRES_PORT')
+    return ApiConfig(
+        database_engine=(_get_first_env('DATABASE_ENGINE') or '').lower(),
+        sqlite_db_path=_get_first_env('SQLITE_DB_PATH'),
+        database_table=_get_first_env('DATABASE_TABLE', 'POSTGRESQL_TABLE', 'POSTGRES_TABLE'),
+        postgres_host=_get_first_env('POSTGRESQL_HOST', 'POSTGRES_HOST'),
+        postgres_port_raw=postgres_port_raw,
+        postgres_port=_safe_int(postgres_port_raw),
+        postgres_user=_get_first_env('POSTGRESQL_USER', 'POSTGRES_USER'),
+        postgres_password=_get_first_env('POSTGRESQL_PASSWORD', 'POSTGRES_PASSWORD'),
+        postgres_database=_get_first_env('POSTGRESQL_DATABASE', 'POSTGRES_DB'),
+    )
+
+
+def _validate_api_config(config: ApiConfig) -> None:
+    errors = []
+
+    if not config.database_engine:
+        errors.append('DATABASE_ENGINE is required and must be one of: postgres, sqlite')
+    elif config.database_engine not in {'postgres', 'sqlite'}:
+        errors.append(
+            f'DATABASE_ENGINE="{config.database_engine}" is invalid; use "postgres" or "sqlite"'
+        )
+
+    if config.database_engine == 'sqlite':
+        if not config.sqlite_db_path:
+            errors.append('SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite')
+        if not config.database_table:
+            errors.append('DATABASE_TABLE is required when DATABASE_ENGINE=sqlite')
+
+    if config.database_engine == 'postgres':
+        if not config.postgres_host:
+            errors.append('POSTGRESQL_HOST (or POSTGRES_HOST alias) is required when DATABASE_ENGINE=postgres')
+        if not config.postgres_port_raw:
+            errors.append('POSTGRESQL_PORT (or POSTGRES_PORT alias) is required when DATABASE_ENGINE=postgres')
+        elif config.postgres_port is None:
+            errors.append(f'POSTGRESQL_PORT must be an integer; got "{config.postgres_port_raw}"')
+        if not config.postgres_user:
+            errors.append('POSTGRESQL_USER (or POSTGRES_USER alias) is required when DATABASE_ENGINE=postgres')
+        if not config.postgres_password:
+            errors.append('POSTGRESQL_PASSWORD (or POSTGRES_PASSWORD alias) is required when DATABASE_ENGINE=postgres')
+        if not config.postgres_database:
+            errors.append('POSTGRESQL_DATABASE (or POSTGRES_DB alias) is required when DATABASE_ENGINE=postgres')
+        if not config.database_table:
+            errors.append('DATABASE_TABLE (or POSTGRESQL_TABLE/POSTGRES_TABLE alias) is required when DATABASE_ENGINE=postgres')
+
+    if errors:
+        raise ValueError('Invalid API configuration:\n- ' + '\n- '.join(errors))
+
+
+RUNTIME_CONFIG: Optional[ApiConfig] = None
+
+
+def get_runtime_config() -> ApiConfig:
+    global RUNTIME_CONFIG
+    if RUNTIME_CONFIG is None:
+        config = _build_api_config()
+        _validate_api_config(config)
+        RUNTIME_CONFIG = config
+    return RUNTIME_CONFIG
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +119,12 @@ logger = logging.getLogger(__name__)
 
 # FastAPI app
 app = FastAPI(title="Seek Jobs API", version="1.0.0", description="Read-only API for Seek job listings")
+
+
+@app.on_event("startup")
+async def validate_startup_config() -> None:
+    config = get_runtime_config()
+    logger.info("API configuration validated (DATABASE_ENGINE=%s)", config.database_engine)
 
 
 # Models
@@ -71,13 +164,11 @@ class RegionResponse(BaseModel):
 # Database connection helper
 def get_db_connection():
     """Create a new database connection"""
+    config = get_runtime_config()
     try:
-        if DATABASE_ENGINE == 'sqlite':
-            if not SQLITE_DB_PATH:
-                raise ValueError('SQLITE_DB_PATH is required when DATABASE_ENGINE=sqlite')
-
+        if config.database_engine == 'sqlite':
             project_root = Path(__file__).resolve().parents[1]
-            sqlite_path = Path(SQLITE_DB_PATH)
+            sqlite_path = Path(config.sqlite_db_path)
             if not sqlite_path.is_absolute():
                 sqlite_path = project_root / sqlite_path
 
@@ -86,11 +177,11 @@ def get_db_connection():
             return conn
 
         conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
+            host=config.postgres_host,
+            port=config.postgres_port,
+            user=config.postgres_user,
+            password=config.postgres_password,
+            database=config.postgres_database,
             cursor_factory=RealDictCursor
         )
         conn.set_session(autocommit=True)
@@ -102,8 +193,9 @@ def get_db_connection():
 
 def execute_query(sql: str, params=None, fetch: str = 'all'):
     """Execute a query with engine-aware placeholders and row conversion."""
+    config = get_runtime_config()
     params = tuple(params or ())
-    query = sql.replace('%s', '?') if DATABASE_ENGINE == 'sqlite' else sql
+    query = sql.replace('%s', '?') if config.database_engine == 'sqlite' else sql
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -116,12 +208,12 @@ def execute_query(sql: str, params=None, fetch: str = 'all'):
             row = cursor.fetchone()
             if row is None:
                 return None
-            if DATABASE_ENGINE == 'sqlite':
+            if config.database_engine == 'sqlite':
                 return dict(row)
             return row
 
         rows = cursor.fetchall()
-        if DATABASE_ENGINE == 'sqlite':
+        if config.database_engine == 'sqlite':
             return [dict(row) for row in rows]
         return rows
     finally:
@@ -145,8 +237,9 @@ async def health_check():
 async def get_regions():
     """Get list of available regions"""
     try:
+        config = get_runtime_config()
         rows = execute_query(
-            f'SELECT DISTINCT "Region" FROM "{DB_TABLE}" WHERE "Region" IS NOT NULL ORDER BY "Region"'
+            f'SELECT DISTINCT "Region" FROM "{config.database_table}" WHERE "Region" IS NOT NULL ORDER BY "Region"'
         )
         regions = [row['Region'] for row in rows]
         
@@ -187,6 +280,7 @@ async def get_jobs(
     - is_active: Filter by active status (true/false)
     """
     try:
+        config = get_runtime_config()
         # Build WHERE clause
         conditions = []
         params = []
@@ -197,7 +291,7 @@ async def get_jobs(
         
         if search:
             search_term = f"%{search}%"
-            if DATABASE_ENGINE == 'sqlite':
+            if config.database_engine == 'sqlite':
                 conditions.append('(LOWER("JobTitle") LIKE LOWER(%s) OR LOWER("BusinessName") LIKE LOWER(%s))')
             else:
                 conditions.append('("JobTitle" ILIKE %s OR "BusinessName" ILIKE %s)')
@@ -240,11 +334,11 @@ async def get_jobs(
         sort_order_sql = "DESC" if sort_order == "desc" else "ASC"
         
         # Get total count
-        count_sql = f'SELECT COUNT(*) as total FROM "{DB_TABLE}" WHERE {where_clause}'
+        count_sql = f'SELECT COUNT(*) as total FROM "{config.database_table}" WHERE {where_clause}'
         total = execute_query(count_sql, params, fetch='one')['total']
         
         # Get paginated results
-        if DATABASE_ENGINE == 'sqlite':
+        if config.database_engine == 'sqlite':
             order_clause = f'ORDER BY ({sort_column} IS NULL) ASC, {sort_column} {sort_order_sql}'
         else:
             order_clause = f'ORDER BY {sort_column} {sort_order_sql} NULLS LAST'
@@ -267,7 +361,7 @@ async def get_jobs(
                 "UpdatedAt" as updated_at,
                 "IsActive" as is_active,
                 "IsNew" as is_new
-            FROM "{DB_TABLE}"
+            FROM "{config.database_table}"
             WHERE {where_clause}
             {order_clause}
             LIMIT %s OFFSET %s
@@ -288,6 +382,7 @@ async def get_jobs(
 async def get_job(job_id: str):
     """Get a specific job by ID"""
     try:
+        config = get_runtime_config()
         query_sql = f"""
             SELECT 
                 "Id" as id,
@@ -306,7 +401,7 @@ async def get_job(job_id: str):
                 "UpdatedAt" as updated_at,
                 "IsActive" as is_active,
                 "IsNew" as is_new
-            FROM "{DB_TABLE}"
+            FROM "{config.database_table}"
             WHERE "Id" = %s
         """
         row = execute_query(query_sql, (job_id,), fetch='one')

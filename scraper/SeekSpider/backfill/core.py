@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup
 
 from .config import BackfillConfig
 from .drivers import DriverManager
-from .ai_processor import BackfillAIProcessor
 
 
 class JobDescriptionBackfiller:
@@ -29,7 +28,6 @@ class JobDescriptionBackfiller:
 
         # Initialize managers
         self.driver_manager = DriverManager(self.config, self.logger)
-        self.ai_processor = BackfillAIProcessor(self.config, self.logger)
 
         # Database connection
         self.db = None
@@ -132,7 +130,6 @@ class JobDescriptionBackfiller:
 
         try:
             self._init_csv()
-            self.ai_processor.start()
 
             if self.config.workers > 1:
                 self._run_concurrent(jobs)
@@ -140,7 +137,6 @@ class JobDescriptionBackfiller:
                 self._run_serial(jobs)
 
         finally:
-            self.ai_processor.stop()
             self._close_csv()
 
         self._print_summary()
@@ -180,7 +176,6 @@ class JobDescriptionBackfiller:
                         self._write_csv_row(job_id, title, url, suburb, description)
 
                         text_description = BeautifulSoup(description, 'lxml').get_text(separator=' ').strip()
-                        self.ai_processor.queue_analysis(job_id, text_description)
                     else:
                         self.stats['failed'] += 1
                         self.consecutive_failures += 1
@@ -277,7 +272,6 @@ class JobDescriptionBackfiller:
                 self._write_csv_row(job_id, title, url, suburb, description)
 
                 text_description = BeautifulSoup(description, 'lxml').get_text(separator=' ').strip()
-                self.ai_processor.queue_analysis(job_id, text_description)
                 return True
             else:
                 self.stats['failed'] += 1
@@ -482,7 +476,6 @@ class JobDescriptionBackfiller:
 
     def _print_summary(self):
         """Print summary"""
-        ai_stats = self.ai_processor.get_stats()
 
         self.logger.info("=" * 50)
         self.logger.info("BACKFILL SUMMARY")
@@ -494,20 +487,9 @@ class JobDescriptionBackfiller:
         self.logger.info(f"Driver restarts: {self.stats['driver_restarts']}")
         self.logger.info(f"Success rate: {self.stats['success']/max(self.stats['total'],1)*100:.1f}%")
 
-        if self.config.enable_async_ai:
-            self.logger.info("-" * 50)
-            self.logger.info("AI ANALYSIS (async)")
-            self.logger.info(f"Tech stack analyzed: {ai_stats.get('tech_analyzed', 0)}")
-            self.logger.info(f"Tech stack failures: {ai_stats.get('tech_failed', 0)}")
-            self.logger.info(f"Tech stack skipped: {ai_stats.get('tech_skipped', 0)}")
-            self.logger.info(f"Salary normalized: {ai_stats.get('salary_normalized', 0)}")
-            self.logger.info(f"Salary skipped (no pay range): {ai_stats.get('salary_skipped', 0)}")
-            self.logger.info(f"Salary failures: {ai_stats.get('salary_failed', 0)}")
-
         self.logger.info("=" * 50)
 
     def get_stats(self) -> dict:
         """Get combined statistics"""
         stats = self.stats.copy()
-        stats.update(self.ai_processor.get_stats())
         return stats

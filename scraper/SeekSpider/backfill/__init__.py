@@ -20,15 +20,12 @@ Usage:
 from .config import BackfillConfig, DEFAULT_CONFIG
 from .core import JobDescriptionBackfiller
 from .drivers import DriverManager
-from .ai_processor import BackfillAIProcessor, run_post_ai_analysis
 
 __all__ = [
     'JobDescriptionBackfiller',
     'BackfillConfig',
     'DEFAULT_CONFIG',
     'DriverManager',
-    'BackfillAIProcessor',
-    'run_post_ai_analysis',
 ]
 
 __version__ = '1.0.0'

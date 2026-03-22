@@ -25,7 +25,6 @@ from core.output_manager import OutputManager
 
 from .config import BackfillConfig
 from .core import JobDescriptionBackfiller
-from .ai_processor import run_post_ai_analysis
 
 
 def setup_logging(region: str = None):
@@ -94,12 +93,6 @@ Examples:
     parser.add_argument('--region-filter', type=str, default=None,
                         help='Filter jobs by region. If not specified, processes all regions.')
 
-    # AI options
-    parser.add_argument('--skip-ai', action='store_true',
-                        help='Skip AI analysis after backfill (post-processing)')
-    parser.add_argument('--no-async-ai', action='store_true',
-                        help='Disable async AI analysis during scraping')
-
     # Other options
     parser.add_argument('--include-inactive', action='store_true',
                         help='Include inactive jobs in backfill')
@@ -126,13 +119,11 @@ def main():
         region_filter=args.region_filter,
         region=args.region,
         include_inactive=args.include_inactive,
-        enable_async_ai=not args.no_async_ai,
-        skip_ai_post=args.skip_ai,
         restart_interval=args.restart_interval,
     )
 
     logger.info(f"Arguments: limit={args.limit}, delay={args.delay}, headless={args.headless}, "
-                f"xvfb={not args.no_xvfb}, skip_ai={args.skip_ai}, no_async_ai={args.no_async_ai}, "
+                f"xvfb={not args.no_xvfb},"
                 f"include_inactive={args.include_inactive}, region={args.region}, "
                 f"region_filter={args.region_filter}, restart_interval={args.restart_interval}, "
                 f"workers={args.workers}")
@@ -141,15 +132,6 @@ def main():
     backfiller = JobDescriptionBackfiller(config, logger)
     backfiller.set_csv_file(csv_file)
     backfiller.run(limit=args.limit)
-
-    # Run post AI analysis if needed
-    stats = backfiller.get_stats()
-    if not args.skip_ai and stats['success'] > 0:
-        run_post_ai_analysis(logger)
-    elif args.skip_ai:
-        logger.info("AI analysis skipped (--skip-ai flag)")
-    else:
-        logger.info("AI analysis skipped (no successful backfills)")
 
 
 if __name__ == '__main__':

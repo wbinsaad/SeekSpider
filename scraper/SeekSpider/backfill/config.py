@@ -29,10 +29,6 @@ class BackfillConfig:
     region_filter: Optional[str] = None  # Filter jobs by region
     include_inactive: bool = False  # Include inactive jobs
 
-    # AI settings
-    enable_async_ai: bool = True  # Enable async AI analysis
-    skip_ai_post: bool = False  # Skip AI analysis after backfill
-
     # Output
     region: Optional[str] = None  # Region for output organization
 

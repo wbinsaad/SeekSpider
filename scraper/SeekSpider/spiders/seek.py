@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 from scrapy import Request
 from scrapy.exceptions import CloseSpider
 
-from SeekSpider.core.ai_client import AIClient
 from SeekSpider.core.config import config
 from SeekSpider.core.database import DatabaseManager
 from SeekSpider.core.regions import AUSTRALIAN_REGIONS, DEFAULT_REGION, get_seek_location, is_valid_region
@@ -26,7 +25,6 @@ class SeekSpider(scrapy.Spider):
         # Initialize core components
         self.db = DatabaseManager(config)
         self.db.set_logger(self.logger)
-        self.ai_client = AIClient(config)
 
         # Initialize scraped job IDs set
         self.scraped_job_ids = set()

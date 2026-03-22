@@ -63,5 +63,5 @@ services:
     ports:
       - "127.0.0.1:6059:8000"
     volumes:
-      - ./data:/app/data
+      - /var/lib/seek-app/data:/app/data
     restart: unless-stopped
